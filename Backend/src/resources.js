@@ -1,5 +1,5 @@
 /**
- * Resource registry for RugOS ERP (MongoDB database: rugos_erp only).
+ * Resource registry for RugOS ERP.
  * idField = unique business key used in URLs and upserts.
  */
 export const RESOURCES = {

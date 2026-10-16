@@ -37,7 +37,7 @@ async function seed() {
     summary.push(`${name}: ${rows.length}`)
   }
 
-  console.log('Seeded rugos_erp:')
+  console.log('Seed complete:')
   summary.forEach((line) => console.log('  -', line))
   process.exit(0)
 }

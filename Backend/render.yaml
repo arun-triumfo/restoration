@@ -1,0 +1,12 @@
+# Optional Blueprint — or set these manually in Render Dashboard → Environment
+services:
+  - type: web
+    name: restoration-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false

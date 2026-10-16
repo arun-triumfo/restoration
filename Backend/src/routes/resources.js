@@ -13,7 +13,6 @@ const router = Router()
 router.get('/', (_req, res) => {
   res.json({
     success: true,
-    database: 'rugos_erp',
     resources: Object.entries(RESOURCES).map(([key, meta]) => ({
       key,
       idField: meta.idField,
