@@ -21,18 +21,33 @@ const PORT = process.env.PORT || 5000
 const MONGODB_URI =
   process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/rugos_erp'
 
-app.use(cors())
+app.use(cors({ origin: true }))
 app.use(express.json({ limit: '5mb' }))
 app.use(morgan('dev'))
 
-app.get('/api/health', (_req, res) => {
-  res.json({
+function healthPayload() {
+  return {
     success: true,
     service: 'rugos-backend',
     database: mongoose.connection?.name || null,
+    readyState: mongoose.connection?.readyState,
     resources: Object.keys(RESOURCES).length,
     time: new Date().toISOString(),
+  }
+}
+
+// Root + health (Render probes often hit /)
+app.get('/', (_req, res) => {
+  res.json({
+    ...healthPayload(),
+    message: 'RugOS API is running',
+    docs: '/api/health',
   })
+})
+app.head('/', (_req, res) => res.status(200).end())
+
+app.get('/api/health', (_req, res) => {
+  res.json(healthPayload())
 })
 
 // Catalog of all resources

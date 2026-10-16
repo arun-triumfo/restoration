@@ -1,4 +1,9 @@
-const API_BASE = '/api'
+/**
+ * API base:
+ * - Production / preview: set VITE_API_URL (e.g. https://restoration-b.onrender.com/api)
+ * - Local Vite: defaults to /api (proxied to localhost:5000)
+ */
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || '/api'
 
 export class ApiError extends Error {
   status: number
@@ -45,7 +50,10 @@ export function sanitizePayload(payload: ResourceRow): ResourceRow {
 }
 
 export const api = {
-  health: () => request<{ success: boolean; resources: number }>('/health'),
+  base: API_BASE,
+
+  health: () =>
+    request<{ success: boolean; resources: number; database?: string }>('/health'),
 
   list: (resource: string, search = '') => {
     const q = search ? `?search=${encodeURIComponent(search)}` : ''

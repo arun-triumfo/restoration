@@ -1,8 +1,28 @@
 import mongoose from 'mongoose'
 
+function resolveDbName(uri) {
+  // Explicit override (recommended on Render)
+  if (process.env.MONGODB_DB) return process.env.MONGODB_DB
+
+  try {
+    const parsed = new URL(uri)
+    const fromPath = parsed.pathname?.replace(/^\//, '')
+    if (fromPath) return fromPath
+  } catch {
+    // ignore parse errors for non-standard URIs
+  }
+
+  // Atlas URI without /dbname defaults to "test" — force our app DB
+  if (uri.includes('mongodb+srv://') || uri.includes('mongodb.net')) {
+    return 'restoration'
+  }
+
+  return undefined
+}
+
 /**
- * Connect to MongoDB. Database name comes from MONGODB_URI path
- * (e.g. ...mongodb.net/restoration or localhost/rugos_erp).
+ * Connect to MongoDB.
+ * Prefer MONGODB_URI with /restoration in the path, or set MONGODB_DB=restoration.
  */
 export async function connectDB(uri) {
   if (!uri) {
@@ -11,7 +31,6 @@ export async function connectDB(uri) {
     )
   }
 
-  // Block accidental blank / invalid URIs that fall back to nothing useful
   if (uri.includes('127.0.0.1') || uri.includes('localhost')) {
     if (process.env.RENDER || process.env.NODE_ENV === 'production') {
       throw new Error(
@@ -22,11 +41,12 @@ export async function connectDB(uri) {
 
   mongoose.set('strictQuery', true)
 
+  const dbName = resolveDbName(uri)
   await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 15000,
+    serverSelectionTimeoutMS: 20000,
+    ...(dbName ? { dbName } : {}),
   })
 
-  const dbName = mongoose.connection.name
-  console.log(`MongoDB connected → ${dbName}`)
-  return dbName
+  console.log(`MongoDB connected → ${mongoose.connection.name}`)
+  return mongoose.connection.name
 }
