@@ -302,7 +302,8 @@ export const RESOURCE_META: ResourceMeta[] = [
     label: 'Alerts',
     title: 'Automation & Alerts',
     subtitle: 'Operational alerts and escalations',
-    path: '/alerts',
+    /** Dedicated page at /alerts — keep path off ResourcePage routing */
+    path: '/alerts-data',
     columns: [
       col('id', 'ID'),
       col('domain', 'Domain'),
@@ -317,9 +318,10 @@ export const RESOURCE_META: ResourceMeta[] = [
     key: 'automations',
     idField: 'id',
     label: 'Automations',
-    title: 'Demand Forecast Rules',
-    subtitle: 'Automation rules driving forecast & ops',
-    path: '/forecast',
+    title: 'Automation Rules',
+    subtitle: 'SOW automation rules engine',
+    /** Dedicated page at /alerts — keep path off ResourcePage routing */
+    path: '/automations-data',
     columns: [
       col('id', 'ID'),
       col('name', 'Name'),

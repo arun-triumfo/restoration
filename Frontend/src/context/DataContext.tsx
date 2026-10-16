@@ -28,7 +28,15 @@ interface DataContextValue {
 const DataContext = createContext<DataContextValue | null>(null)
 
 /** Load these first so Inventory / Orders / Dashboard feel instant */
-const PRIORITY_KEYS = ['skus', 'orders', 'alerts', 'warehouses', 'system_logs', 'monthly_financials']
+const PRIORITY_KEYS = [
+  'skus',
+  'orders',
+  'alerts',
+  'automations',
+  'warehouses',
+  'system_logs',
+  'monthly_financials',
+]
 
 async function fetchKeys(keys: string[]) {
   const results = await Promise.allSettled(

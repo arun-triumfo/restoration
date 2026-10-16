@@ -111,7 +111,7 @@ export function Dashboard() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-main)] sm:text-2xl">
-            Restoration Rugs — Executive Command Center
+            Odette Rugs — Executive Command Center
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             Live metrics from MongoDB · {loading ? 'syncing…' : 'connected to rugos_erp'}

@@ -22,15 +22,15 @@ export function Header() {
         <div className="flex min-w-0 items-center gap-2.5">
           <img
             src="https://www.odetterugs.com/cdn/shop/files/Odette-Rugs-Fave-IconOdette-Rugs-Fave-Icon_1.png?crop=center&height=32&v=1754630107&width=32"
-            alt="Restoration Rugs"
+            alt="Odette Rugs"
             className="h-7 w-7 rounded-md object-contain"
           />
           <div className="hidden min-w-0 sm:block">
             <p className="truncate text-[15px] font-extrabold tracking-tight text-[var(--text-main)]">
-              Restoration Rugs <span className="text-cyan-600 dark:text-cyan-400">/ RugOS</span>
+              Odette Rugs <span className="text-cyan-600 dark:text-cyan-400">/ RugOS</span>
             </p>
             <p className="truncate text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
-              restorationrugs.com • US Handcrafted Living
+              odetterugs.com • US Handcrafted Living
             </p>
           </div>
         </div>
