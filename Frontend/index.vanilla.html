@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restoration Rugs — Enterprise Commerce, Export, Warehouse &amp; Finance Platform</title>
+  <link rel="shortcut icon" type="image/png"
+    href="https://www.odetterugs.com/cdn/shop/files/Odette-Rugs-Fave-IconOdette-Rugs-Fave-Icon_1.png?crop=center&height=32&v=1754630107&width=32">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="theme-light">
+  <!-- Top Application Header -->
+  <header class="app-header" id="appHeader">
+    <div class="header-left">
+      <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <div class="brand-badge" onclick="switchView('mod8')">
+        <div class="brand-logo">
+          <img
+            src="https://www.odetterugs.com/cdn/shop/files/Odette-Rugs-Fave-IconOdette-Rugs-Fave-Icon_1.png?crop=center&height=32&v=1754630107&width=32"
+            alt="Restoration Rugs" style="width: 28px; height: 28px; border-radius: 6px; object-fit: contain;">
+          <div class="brand-titles">
+            <span class="brand-name">Restoration Rugs <span class="brand-accent">/ RugOS</span></span>
+            <span class="brand-sub">restorationrugs.com • US Handcrafted Living</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="header-center">
+      <div class="global-search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="globalSearchInput" placeholder="Quick find Order, SKU, AWB, Shipping Bill, Invoice...">
+        <span class="kbd-shortcut">⌘K</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Theme Switcher (Black & White) -->
+      <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Black / White Theme">
+        <span id="themeIcon">☀️</span>
+        <span id="themeLabel">Light Mode</span>
+      </button>
+
+      <div class="user-avatar-pill" onclick="openUserProfile()" style="cursor: pointer;"
+        title="Open Ctas Admin Profile">
+        <div class="avatar">CT</div>
+        <div class="user-info">
+          <span class="user-name">Ctas Admin</span>
+          <span class="user-role-display" id="userRoleTag">Management</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="app-sidebar" id="appSidebar">
+      <!-- <div class="sidebar-header-box">
+        <span class="sidebar-section-title">PLATFORM NAVIGATION</span>
+        <span class="sidebar-active-badge">ACTIVE SCOPE</span>
+      </div> -->
+      <nav class="sidebar-nav" id="sidebarNav">
+        <!-- Overview -->
+        <div class="nav-module-heading">OVERVIEW</div>
+        <a href="#mod8-dash" class="nav-item active" data-module="mod8">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg></span>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="#mod8-forecast" class="nav-item" data-module="mod8-forecast">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+              <polyline points="17 6 23 6 23 12"></polyline>
+            </svg></span>
+          <span class="nav-text">Demand Forecast</span>
+        </a>
+        <a href="#mod8-automation" class="nav-item" data-module="mod8-auto">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg></span>
+          <span class="nav-text">Automation & Alerts</span>
+        </a>
+        <a href="#mod8-integrations" class="nav-item" data-module="mod8-integ">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg></span>
+          <span class="nav-text">Integrations</span>
+        </a>
+
+        <!-- Inventory & Warehouses -->
+        <div class="nav-module-heading">INVENTORY & WAREHOUSES</div>
+        <a href="#mod2-products" class="nav-item" data-module="mod2-prod">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line>
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+              </path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg></span>
+          <span class="nav-text">Inventory</span>
+        </a>
+        <a href="#mod2-warehouse" class="nav-item" data-module="mod2-wh">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 21h18"></path>
+              <path d="M5 21V7l7-4 7 4v14"></path>
+              <path d="M9 18h6v-4H9z"></path>
+            </svg></span>
+          <span class="nav-text">Warehouses</span>
+        </a>
+        <a href="#mod3-wh-analytics" class="nav-item" data-module="mod3-wh-analytics">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg></span>
+          <span class="nav-text">Warehouse Analytics</span>
+        </a>
+        <a href="#mod2-history" class="nav-item" data-module="mod2-hist">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg></span>
+          <span class="nav-text">Stock History</span>
+        </a>
+
+        <!-- Orders & Fulfillment -->
+        <div class="nav-module-heading">ORDERS & FULFILLMENT</div>
+        <a href="#mod3-orders" class="nav-item" data-module="mod3">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <path d="M16 10a4 4 0 0 1-8 0"></path>
+            </svg></span>
+          <span class="nav-text">Orders</span>
+        </a>
+        <a href="#mod4-po" class="nav-item" data-module="mod4-po">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg></span>
+          <span class="nav-text">Purchase Orders</span>
+        </a>
+        <a href="#mod4-transfer" class="nav-item" data-module="mod4-transfer">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="17 1 21 5 17 9"></polyline>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+              <polyline points="7 23 3 19 7 15"></polyline>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+            </svg></span>
+          <span class="nav-text">Stock Transfers</span>
+        </a>
+
+        <!-- Shipping & Export -->
+        <div class="nav-module-heading">SHIPPING & EXPORT</div>
+        <a href="#mod5-shipping" class="nav-item" data-module="mod5-ship">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="3" width="15" height="13"></rect>
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+              <circle cx="5.5" cy="18.5" r="2.5"></circle>
+              <circle cx="18.5" cy="18.5" r="2.5"></circle>
+            </svg></span>
+          <span class="nav-text">Shipping & Dispatch</span>
+        </a>
+        <a href="#mod5-exportdocs" class="nav-item" data-module="mod5-docs">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <path d="M9 15l2 2 4-4"></path>
+            </svg></span>
+          <span class="nav-text">Export Docs</span>
+        </a>
+
+        <!-- Finance & Audit -->
+        <div class="nav-module-heading">FINANCE & AUDIT</div>
+        <a href="#mod6-returns" class="nav-item" data-module="mod6-ret">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg></span>
+          <span class="nav-text">Returns & Claims</span>
+        </a>
+        <a href="#mod6-courier-audit" class="nav-item" data-module="mod6-audit">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              <polyline points="9 12 11 14 15 10"></polyline>
+            </svg></span>
+          <span class="nav-text">Courier Audit</span>
+        </a>
+        <a href="#mod6-receivables" class="nav-item" data-module="mod6-rec">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+              <line x1="1" y1="10" x2="23" y2="10"></line>
+            </svg></span>
+          <span class="nav-text">Receivables</span>
+        </a>
+        <a href="#mod7-profitability" class="nav-item" data-module="mod7-cost">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg></span>
+          <span class="nav-text">Profitability</span>
+        </a>
+        <a href="#mod7-reports" class="nav-item" data-module="mod7-rep">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+              <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+            </svg></span>
+          <span class="nav-text">Reports</span>
+        </a>
+
+        <!-- Administration -->
+        <div class="nav-module-heading">ADMINISTRATION & MASTERS</div>
+        <a href="#admin-company" class="nav-item" data-module="admin-company">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 21h18"></path>
+              <path d="M9 8h1"></path>
+              <path d="M9 12h1"></path>
+              <path d="M9 16h1"></path>
+              <path d="M14 8h1"></path>
+              <path d="M14 12h1"></path>
+              <path d="M14 16h1"></path>
+              <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path>
+            </svg></span>
+          <span class="nav-text">Company</span>
+        </a>
+        <a href="#mod2-rbac" class="nav-item" data-module="mod2-rbac">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg></span>
+          <span class="nav-text">Users & RBAC</span>
+        </a>
+        <a href="#admin-logs" class="nav-item" data-module="admin-logs">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" y1="19" x2="20" y2="19"></line>
+            </svg></span>
+          <span class="nav-text">System Logs</span>
+        </a>
+        <a href="#mod8-sow" class="nav-item" data-module="mod8-sow">
+          <span class="nav-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+              </path>
+            </svg></span>
+          <span class="nav-text">System Config</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main Viewport Area -->
+    <main class="app-main" id="mainContainer">
+      <!-- Breadcrumb Bar (Hidden on all pages as requested) -->
+      <div class="breadcrumb-bar" id="breadcrumbBar" style="display: none !important;">
+        <span class="crumb-root" onclick="switchView('mod8')" style="cursor: pointer;">Restoration Rugs Platform</span>
+        <span class="crumb-sep">/</span>
+        <span class="crumb-mod" id="crumbModule">Executive Dashboard</span>
+        <span class="crumb-sep">/</span>
+        <span class="crumb-view" id="crumbView">Command Center Overview</span>
+        <div class="breadcrumb-actions" id="moduleQuickActions"></div>
+      </div>
+
+      <!-- Blueprint Banner (Shown when Blueprint Mode is active) -->
+      <div class="blueprint-spec-banner" id="blueprintBanner" style="display: none;">
+        <div class="bp-icon">📐</div>
+        <div class="bp-content">
+          <strong id="bpTitle">SOW Blueprint & Functional Specification Active</strong>
+          <p id="bpDescription">Showing UX wireframe annotations, acceptance criteria, database entities, and
+            operational constraints directly mapped to SOW sections.</p>
+        </div>
+        <button class="btn btn-sm btn-ghost" id="bpDismiss">Hide Specs</button>
+      </div>
+
+      <!-- DYNAMIC CONTENT VIEWPORT -->
+      <div class="view-viewport" id="viewViewport">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </main>
+  </div>
+
+  <!-- MODALS CONTAINER FOR CRUD, IMPORT, EXPORT & E2E -->
+
+  <!-- Modal: Universal CRUD Add / Edit Modal -->
+  <div class="modal-backdrop" id="crudModal" style="display: none;">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="badge badge-primary" id="crudBadge">Create Record</span>
+          <h3 id="crudModalTitle">Add New Record</h3>
+        </div>
+        <button class="modal-close" onclick="closeModal('crudModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="crudModalBody"></div>
+      <div class="modal-footer" id="crudModalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Advanced File Import Modal -->
+  <div class="modal-backdrop" id="importModal" style="display: none;">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="badge badge-cyan">SOW Module 2.3 & 9.1</span>
+          <h3 id="importModalTitle">Advanced CSV / Excel Bulk Importer</h3>
+        </div>
+        <button class="modal-close" onclick="closeModal('importModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="importModalBody"></div>
+      <div class="modal-footer" id="importModalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Advanced File Export Modal -->
+  <div class="modal-backdrop" id="exportModal" style="display: none;">
+    <div class="modal-box modal-md">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="badge badge-primary">SOW Module 7.2</span>
+          <h3 id="exportModalTitle">Export Data Report</h3>
+        </div>
+        <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="exportModalBody"></div>
+      <div class="modal-footer" id="exportModalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Delete Confirmation Modal -->
+  <div class="modal-backdrop" id="deleteConfirmModal" style="display: none;">
+    <div class="modal-box modal-md">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="badge badge-danger">Confirm Deletion</span>
+          <h3 id="deleteModalTitle">Delete Confirmation</h3>
+        </div>
+        <button class="modal-close" onclick="closeModal('deleteConfirmModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="deleteModalBody">
+        <p id="deleteModalMessage" style="font-size: 13px; color: var(--text-main); margin-bottom: 12px;"></p>
+        <p style="font-size: 11px; color: var(--text-muted);">This action is logged in the operational audit trail as
+          required by SOW Module 2.1.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('deleteConfirmModal')">Cancel</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn">Delete Record</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Drawer: Notification Drawer -->
+  <div class="drawer-backdrop" id="alertDrawer" style="display: none;">
+    <div class="drawer-box">
+      <div class="drawer-header">
+        <h3>Operational & Financial Alerts</h3>
+        <button class="drawer-close" onclick="toggleAlertDrawer()">&times;</button>
+      </div>
+      <div class="drawer-body" id="alertDrawerList"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="rugos-api.js"></script>
+  <script src="app.js"></script>
+  <!-- Deterministic analytics layer (Module 8 + warehouse node analytics).
+       Loaded after app.js so these definitions supersede the original stubs. -->
+  <script src="analytics-core.js"></script>
+  <script src="analytics-actions.js"></script>
+  <script src="analytics-forecast.js"></script>
+  <script src="analytics-warehouse.js"></script>
+</body>
+
+</html>
