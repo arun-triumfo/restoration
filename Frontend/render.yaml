@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: restoration-f
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://restoration-b.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

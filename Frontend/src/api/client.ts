@@ -1,9 +1,26 @@
 /**
- * API base:
- * - Production / preview: set VITE_API_URL (e.g. https://restoration-b.onrender.com/api)
- * - Local Vite: defaults to /api (proxied to localhost:5000)
+ * Resolve API base URL:
+ * 1) VITE_API_URL (build-time)
+ * 2) Production hosts → Render backend
+ * 3) Local Vite → /api (proxied to localhost:5000)
  */
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || '/api'
+function resolveApiBase(): string {
+  const fromEnv = String(import.meta.env.VITE_API_URL || '')
+    .trim()
+    .replace(/\/$/, '')
+  if (fromEnv) return fromEnv
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return 'https://restoration-b.onrender.com/api'
+    }
+  }
+
+  return '/api'
+}
+
+const API_BASE = resolveApiBase()
 
 export class ApiError extends Error {
   status: number
@@ -14,7 +31,8 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const base = resolveApiBase()
+  const res = await fetch(`${base}${path}`, {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     ...init,
   })
@@ -50,7 +68,9 @@ export function sanitizePayload(payload: ResourceRow): ResourceRow {
 }
 
 export const api = {
-  base: API_BASE,
+  get base() {
+    return resolveApiBase()
+  },
 
   health: () =>
     request<{ success: boolean; resources: number; database?: string }>('/health'),

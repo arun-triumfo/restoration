@@ -139,7 +139,7 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          API error: {error}. Ensure Backend is running on port 5000.
+          API error: {error}. Check backend at https://restoration-b.onrender.com/api/health
         </div>
       ) : null}
 
