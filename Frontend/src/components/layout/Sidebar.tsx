@@ -76,30 +76,33 @@ export function Sidebar() {
       {mobileNavOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+          className="fixed inset-0 top-16 z-40 bg-slate-950/45 lg:hidden"
           aria-label="Close navigation overlay"
           onClick={() => setMobileNavOpen(false)}
         />
       ) : null}
 
       <aside
-        className={`fixed inset-y-16 left-0 z-50 flex w-64 flex-col border-r border-[var(--border-main)] bg-[var(--bg-sidebar)] transition-transform duration-200 lg:static lg:inset-auto lg:z-0 lg:translate-x-0 lg:pointer-events-auto ${
+        className={`rugos-sidebar fixed bottom-0 left-0 top-16 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-[var(--border-main)] bg-[var(--bg-sidebar)] shadow-xl transition-transform duration-200 lg:static lg:top-auto lg:z-0 lg:h-auto lg:w-64 lg:translate-x-0 lg:shadow-none lg:pointer-events-auto ${
           mobileNavOpen
-            ? 'translate-x-0'
+            ? 'translate-x-0 pointer-events-auto'
             : '-translate-x-full pointer-events-none lg:pointer-events-auto'
-        } ${sidebarCollapsed ? 'lg:w-[72px]' : 'lg:w-64'}`}
+        } ${sidebarCollapsed ? 'lg:!w-[72px]' : 'lg:!w-64'}`}
       >
-        <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Primary">
+        <nav
+          className="rugos-sidebar-nav flex-1 overflow-y-auto overscroll-contain px-2.5 py-3"
+          aria-label="Primary"
+        >
           {NAV_SECTIONS.map((section) => (
-            <div key={section.title} className="mb-3">
+            <div key={section.title} className="mb-4">
               <div
-                className={`mb-1.5 flex items-center gap-2 px-2 ${
+                className={`mb-2 flex items-center gap-2 px-2.5 ${
                   sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''
                 }`}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400/70" />
                 <span
-                  className={`text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] ${
+                  className={`text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-dim)] ${
                     sidebarCollapsed ? 'lg:hidden' : ''
                   }`}
                 >
@@ -107,26 +110,32 @@ export function Sidebar() {
                 </span>
               </div>
 
-              <ul className="space-y-0.5">
+              <ul className="m-0 list-none space-y-1 p-0">
                 {section.items.map((item) => {
                   const Icon = ICONS[item.icon] ?? Package
                   return (
-                    <li key={item.path}>
+                    <li key={item.path} className="m-0 p-0">
                       <NavLink
                         to={item.path}
                         end={item.path === '/'}
                         title={item.label}
                         onClick={() => setMobileNavOpen(false)}
                         className={({ isActive }) =>
-                          `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition ${
+                          [
+                            'rugos-nav-link flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium leading-snug no-underline transition',
                             isActive
                               ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]'
-                          } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`
+                              : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-main)]',
+                            sidebarCollapsed ? 'lg:justify-center lg:px-2' : '',
+                          ].join(' ')
                         }
                       >
-                        <Icon className="h-[15px] w-[15px] shrink-0" />
-                        <span className={sidebarCollapsed ? 'lg:hidden' : ''}>{item.label}</span>
+                        <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                        <span
+                          className={`min-w-0 truncate ${sidebarCollapsed ? 'lg:hidden' : ''}`}
+                        >
+                          {item.label}
+                        </span>
                       </NavLink>
                     </li>
                   )

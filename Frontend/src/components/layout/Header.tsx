@@ -51,15 +51,20 @@ export function Header() {
         </label>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
-        <Button variant="secondary" size="sm" onClick={toggleTheme} className="hidden sm:inline-flex">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={toggleTheme}
+          className="!hidden sm:!inline-flex"
+        >
           {theme === 'light' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
           {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
         </Button>
         <Button
           variant="secondary"
           size="sm"
-          className="!h-9 !w-9 !px-0 sm:hidden"
+          className="!inline-flex !h-9 !w-9 !px-0 sm:!hidden"
           onClick={toggleTheme}
           aria-label="Toggle theme"
         >
@@ -68,14 +73,14 @@ export function Header() {
 
         <button
           type="button"
-          className="flex items-center gap-2 rounded-full border border-[var(--border-main)] bg-[var(--bg-card)] py-1 pl-1 pr-2 sm:pr-3"
+          className="flex max-w-[40vw] items-center gap-2 rounded-full border border-[var(--border-main)] bg-[var(--bg-card)] py-1 pl-1 pr-1.5 sm:pr-3"
           title="Ctas Admin Profile"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
             CT
           </span>
-          <span className="hidden text-left sm:block">
-            <span className="block text-xs font-semibold text-[var(--text-main)]">Ctas Admin</span>
+          <span className="hidden min-w-0 text-left sm:block">
+            <span className="block truncate text-xs font-semibold text-[var(--text-main)]">Ctas Admin</span>
             <span className="block text-[10px] text-[var(--text-muted)]">Super Admin</span>
           </span>
         </button>

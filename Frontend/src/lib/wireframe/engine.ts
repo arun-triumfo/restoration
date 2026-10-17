@@ -49,13 +49,112 @@ function loadScript(src: string): Promise<void> {
   })
 }
 
-function ensureStylesheet() {
-  if (document.getElementById('rugos-wf-styles')) return
-  const link = document.createElement('link')
-  link.id = 'rugos-wf-styles'
-  link.rel = 'stylesheet'
-  link.href = '/styles.css'
-  document.head.appendChild(link)
+/**
+ * Load wireframe styles without breaking the React shell.
+ * styles.css contains `* { margin:0; padding:0 }` which zeros Tailwind padding
+ * on the sidebar — so we strip that and keep wireframe rules for .wf-root only
+ * where possible.
+ */
+async function ensureStylesheet() {
+  const existing = document.getElementById('rugos-wf-styles')
+  if (existing?.dataset.scoped === '1') return
+  // Drop any previous unscoped <link> / <style> injection
+  existing?.remove()
+
+  let css = ''
+  try {
+    const res = await fetch('/styles.css')
+    css = await res.text()
+  } catch {
+    const link = document.createElement('link')
+    link.id = 'rugos-wf-styles'
+    link.dataset.scoped = '1'
+    link.rel = 'stylesheet'
+    link.href = '/styles.css'
+    document.head.appendChild(link)
+    return
+  }
+
+  // Remove universal margin/padding reset (keeps box-sizing only)
+  css = css.replace(
+    /\*\s*\{[^}]*\}/g,
+    '* { box-sizing: border-box; }',
+  )
+
+  // Neutralize body layout rules that fight the React app shell
+  css = css.replace(/body\s*\{[^}]*\}/g, (block) =>
+    block
+      .replace(/overflow\s*:\s*hidden\s*;?/gi, '')
+      .replace(/height\s*:\s*100vh\s*;?/gi, ''),
+  )
+
+  // Scope aggressive full-width / layout overrides to wireframe viewport only
+  css = css.replace(
+    /\.app-main,\s*\n?\s*\.view-viewport,/g,
+    '.wf-root .app-main,\n.wf-root .view-viewport,',
+  )
+
+  const style = document.createElement('style')
+  style.id = 'rugos-wf-styles'
+  style.dataset.scoped = '1'
+  style.textContent = `${css}
+
+/* —— Protect React shell from wireframe leakage —— */
+.rugos-shell aside,
+.rugos-shell aside * {
+  box-sizing: border-box;
+}
+.rugos-shell aside a {
+  text-decoration: none !important;
+}
+.rugos-shell header,
+.rugos-shell aside {
+  font-family: var(--font-sans), Inter, system-ui, sans-serif;
+}
+
+/* —— Mobile-friendly wireframe content —— */
+@media (max-width: 1023px) {
+  .wf-root .page-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .wf-root .page-actions,
+  .wf-root #moduleQuickActions,
+  .wf-root .status-filter-pills,
+  .wf-root .table-toolbar-box {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .wf-root .view-viewport {
+    padding: 12px !important;
+    overflow-x: auto !important;
+  }
+  .wf-root .table-responsive,
+  .wf-root .data-table {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .wf-root .data-table {
+    min-width: 720px;
+  }
+  .wf-root .filter-pill-btn {
+    font-size: 11px !important;
+    padding: 6px 10px !important;
+  }
+  .wf-root .page-title-wrap h1 {
+    font-size: 16px !important;
+  }
+  .modal-box {
+    width: 96vw !important;
+    max-width: 96vw !important;
+    margin: 8px !important;
+  }
+}
+`
+  document.head.appendChild(style)
 }
 
 /** Hidden DOM shells required by app.js modals / router */
@@ -182,7 +281,7 @@ function patchGlobals(pushToast: ToastFn) {
 }
 
 export async function ensureWireframeEngine(pushToast: ToastFn): Promise<void> {
-  ensureStylesheet()
+  await ensureStylesheet()
   ensureWireframeDom()
 
   // Point vanilla ApiClient at production/live backend when available

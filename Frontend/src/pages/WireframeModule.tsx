@@ -52,7 +52,6 @@ export function WireframeModule() {
     return () => cancelAnimationFrame(id)
   }, [ready, moduleKey, skus, orders])
 
-  // Re-paint when theme toggles (wireframe uses body.theme-*)
   useEffect(() => {
     if (!ready) return
     const obs = new MutationObserver(() => {
@@ -63,9 +62,9 @@ export function WireframeModule() {
   }, [ready, moduleKey])
 
   return (
-    <div className="wf-root -m-4 min-h-full sm:-m-6">
+    <div className="wf-root -mx-3 -my-3 min-w-0 sm:-mx-4 sm:-my-4 lg:-mx-6 lg:-my-6">
       {error ? (
-        <div className="m-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="m-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 sm:m-4">
           {error}
         </div>
       ) : null}
@@ -78,10 +77,13 @@ export function WireframeModule() {
 
       <div
         id="moduleQuickActions"
-        className="flex flex-wrap items-center justify-end gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-2.5 sm:px-6"
+        className="flex flex-wrap items-center justify-end gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 sm:px-4 lg:px-6"
       />
 
-      <div id="viewViewport" className="view-viewport wf-viewport p-4 sm:p-6" />
+      <div
+        id="viewViewport"
+        className="view-viewport wf-viewport min-w-0 overflow-x-auto p-3 sm:p-4 lg:p-6"
+      />
     </div>
   )
 }
