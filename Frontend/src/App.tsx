@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell'
 import { AppProvider } from './context/AppContext'
 import { DataProvider } from './context/DataContext'
 import { PATH_TO_MODULE } from './lib/wireframe/moduleMap'
+import { SystemWorkflow } from './pages/SystemWorkflow'
 import { WireframeModule } from './pages/WireframeModule'
 
 /** Every nav path that has a wireframe module renderer */
@@ -16,6 +17,7 @@ export default function App() {
           <Routes>
             <Route element={<AppShell />}>
               <Route index element={<WireframeModule />} />
+              <Route path="workflow" element={<SystemWorkflow />} />
               {wireframePaths.map((path) => (
                 <Route
                   key={path}

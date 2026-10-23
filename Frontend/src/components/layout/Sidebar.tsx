@@ -13,6 +13,7 @@ import {
   Factory,
   FileCheck,
   FileText,
+  GitBranch,
   Hammer,
   Layers,
   LayoutDashboard,
@@ -37,6 +38,7 @@ import { NAV_SECTIONS } from '../../data/navigation'
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard,
+  GitBranch,
   TrendingUp,
   Bell,
   Zap,

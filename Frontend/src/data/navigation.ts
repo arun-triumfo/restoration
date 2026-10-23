@@ -5,6 +5,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'OVERVIEW',
     items: [
       { label: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
+      { label: 'System Workflow', path: '/workflow', icon: 'GitBranch' },
       { label: 'Demand Forecast', path: '/forecast', icon: 'TrendingUp' },
       { label: 'Automation & Alerts', path: '/alerts', icon: 'Bell' },
       { label: 'Integrations', path: '/integrations', icon: 'Zap' },
