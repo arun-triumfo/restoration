@@ -290,8 +290,8 @@ export function DepartmentHome() {
           Welcome, {user?.name?.split(' ')[0] || 'teammate'}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
-          Ye aapke role ke liye short home hai. Neeche cards se seedha kaam shuru karein — poora menu
-          left sidebar mein hai (sirf allowed items).
+          Quick home for your role. Use the cards below to start work — the full menu is in the left
+          sidebar (only items your role can access).
         </p>
         {loading ? (
           <p className="mt-3 text-xs text-[var(--text-dim)]">Loading live counts…</p>
@@ -328,7 +328,7 @@ export function DepartmentHome() {
           to="/workflow"
           className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-700 no-underline dark:text-indigo-300"
         >
-          Open System Workflow / Build roadmap
+          Open System Workflow
         </Link>
       </div>
     </div>

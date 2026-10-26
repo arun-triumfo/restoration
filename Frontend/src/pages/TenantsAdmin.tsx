@@ -82,8 +82,8 @@ export function TenantsAdmin() {
         </p>
         <h1 className="text-2xl font-extrabold text-[var(--text-main)]">Platform tenants</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Naya client company banao — pehla Super Admin + temp password milta hai. Data har tenant ke
-          liye alag rehta hai.
+          Create a new company — first Super Admin gets a temporary password. Data stays isolated per
+          company.
         </p>
       </header>
 

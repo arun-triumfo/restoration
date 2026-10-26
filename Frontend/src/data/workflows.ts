@@ -485,93 +485,97 @@ export const MENU_GUIDE: MenuGuide[] = [
 ]
 
 /**
- * Hamare end se kuch pending NAHI — yeh items CLIENT / external credentials pe depend karte hain.
- * Jab client keys de, hum live wire kar denge (sandbox pehle se ready hai).
+ * Remaining work waits on Restoration company credentials / decisions.
+ * Sandbox flows already work without these keys.
  */
-export type ClientRequirement = {
+export type OwnerRequirement = {
   title: string
-  why: string
+  whyLeft: string
   area: string
   provide: string[]
-  ourStatus: string
+  readyNow: string
 }
 
-export const CLIENT_REQUIRED: ClientRequirement[] = [
+/** Alias kept for older imports */
+export type ClientRequirement = OwnerRequirement
+
+export const OWNER_REQUIRED: OwnerRequirement[] = [
   {
-    title: 'Payment gateway (Stripe ya Razorpay)',
-    why: 'SaaS monthly billing — auto charge + invoice',
+    title: 'Payment gateway (Stripe or Razorpay)',
+    whyLeft: 'Waiting on Restoration billing account keys to turn on live checkout.',
     area: 'Billing',
     provide: [
       'Stripe Secret + Publishable keys OR Razorpay Key ID + Secret',
       'Webhook signing secret',
-      'Preferred currency (USD / INR) aur plan prices',
+      'Preferred currency (USD / INR) and plan prices',
     ],
-    ourStatus: 'Plan switch UI + 402 on suspend already live (demo). Checkout webhook pending keys.',
+    readyNow: 'Plan switch UI and suspend lock already work in demo mode.',
   },
   {
     title: 'Amazon Selling Partner API (SP-API)',
-    why: 'Live Amazon order import (abhi sandbox Sync now)',
+    whyLeft: 'Waiting on Restoration Amazon seller / SP-API app credentials for live orders.',
     area: 'Marketplace',
     provide: [
-      'LWA Client ID + Client Secret',
+      'LWA App ID + App Secret',
       'Refresh token / seller account access',
       'Marketplace IDs (e.g. ATVPDKIKX0DER)',
-      'AWS IAM role ARN if required by SP-API app',
+      'AWS IAM role ARN if required by the SP-API app',
     ],
-    ourStatus: 'Connect / Sync sandbox + order normalize ready. Live client replaces sandbox adapter.',
+    readyNow: 'Sandbox Connect / Sync Now already imports sample Amazon-style orders.',
   },
   {
     title: 'Shopify Admin API',
-    why: 'Live Shopify orders + inventory push',
+    whyLeft: 'Waiting on Restoration Shopify store domain and Admin API token.',
     area: 'Marketplace',
     provide: [
       'Shopify store domain (xxx.myshopify.com)',
-      'Admin API access token (or OAuth app Client ID/Secret)',
-      'Confirm which locations map to USA WH / FBA',
+      'Admin API access token (or OAuth app ID / secret)',
+      'Which locations map to USA warehouse / FBA',
     ],
-    ourStatus: 'Sandbox sync creates orders. Live OAuth + stock push needs store credentials.',
+    readyNow: 'Sandbox sync already creates Shopify-style orders in the pipeline.',
   },
   {
     title: 'Etsy / Walmart / other channels (optional)',
-    why: 'Extra marketplaces beyond Amazon + Shopify',
+    whyLeft: 'Optional — only if Restoration wants those channels live.',
     area: 'Marketplace',
     provide: ['API keys / OAuth apps per channel', 'SKU mapping rules'],
-    ourStatus: 'Etsy sandbox connector stub ready; same pattern as Shopify.',
+    readyNow: 'Etsy sandbox connector stub follows the same pattern as Shopify.',
   },
   {
     title: 'FedEx / DHL (live courier)',
-    why: 'Real AWB + printable carrier labels',
+    whyLeft: 'Waiting on Restoration carrier account credentials for real AWBs.',
     area: 'Shipping',
     provide: [
-      'FedEx Account + API Key / Secret (or DHL Express credentials)',
+      'FedEx account + API key / secret (or DHL Express credentials)',
       'Meter number / account ZIP',
-      'Optional: AWS S3 (or R2) bucket for label PDFs in production',
+      'Optional: cloud storage bucket for production label files',
     ],
-    ourStatus: 'Sandbox Rate → Label → Track + local /uploads/labels works today.',
+    readyNow: 'Sandbox Rate → Label → Track works today with printable local labels.',
   },
   {
-    title: 'Production hosting confirm',
-    why: 'Go-live URLs + CORS lock',
+    title: 'Production URLs & backup owner',
+    whyLeft: 'Waiting on final Restoration go-live URLs and who owns Atlas restore drills.',
     area: 'Ops',
     provide: [
-      'Final Frontend URL (Render / custom domain)',
-      'Final Backend URL',
-      'Who rotates JWT_SECRET (ops contact)',
-      'Atlas backup owner — complete restore drill once (runbook ready)',
+      'Final frontend URL (Render / custom domain)',
+      'Final backend URL',
+      'Ops contact for JWT secret rotation',
+      'Confirm one Atlas backup restore drill',
     ],
-    ourStatus: 'Helmet, rate-limit, CORS_ORIGINS, OPS_RUNBOOK.md shipped.',
+    readyNow: 'Security hardening and ops runbook are already in place.',
   },
 ]
 
-/** @deprecated use CLIENT_REQUIRED — kept for older Workflow chips */
-export const PLANNED: PlannedItem[] = CLIENT_REQUIRED.map((c) => ({
+export const CLIENT_REQUIRED = OWNER_REQUIRED
+
+export const PLANNED: PlannedItem[] = OWNER_REQUIRED.map((c) => ({
   title: c.title,
-  plain: c.ourStatus,
-  why: c.why,
+  plain: c.whyLeft,
+  why: c.readyNow,
   area: c.area,
 }))
 
-/** Full end-to-end test — client / QA ke liye easy steps (password niche) */
+/** End-to-end test steps for Restoration owners */
 export const FULL_TEST_FLOW: {
   id: string
   title: string
@@ -695,15 +699,15 @@ export const UAT_CHECKLISTS: {
   },
 ]
 
-/** What we already shipped — client can treat as DONE */
+/** What is already available in sandbox for Restoration */
 export const SHIPPED = [
   {
     phase: 'P0',
     title: 'Foundation',
     items: [
-      'Tenant model + default Restoration/Odette tenant',
+      'Tenant model + default Restoration/Odette company',
       'tenantId on all resources + backfill',
-      'API scoped by logged-in tenant',
+      'API scoped by logged-in company',
     ],
   },
   {
@@ -719,9 +723,9 @@ export const SHIPPED = [
   },
   {
     phase: 'P2',
-    title: 'Multi-tenant SaaS',
+    title: 'Multi-company SaaS',
     items: [
-      'Tenant isolation smoke + Tenant B demo user',
+      'Company isolation smoke + Tenant B demo user',
       'Platform Tenants create + admin temp password',
       'Billing plans + suspend → API 402',
       'Plan-based menu feature gates (Starter hides Integrations/Forecast)',
@@ -732,7 +736,7 @@ export const SHIPPED = [
     phase: 'P3',
     title: 'Marketplace (sandbox)',
     items: [
-      'Encrypted credentials per tenant',
+      'Encrypted credentials per company',
       'Integrations hub: Connect / Test / Sync / Disconnect',
       'Shopify + Amazon + Etsy sandbox → Orders',
     ],
@@ -742,7 +746,7 @@ export const SHIPPED = [
     title: 'Warehouse ops',
     items: [
       'Shipping Desk: FedEx/DHL sandbox rate / label / track',
-      'Labels on disk `/uploads/labels` (prod S3 = client bucket)',
+      'Labels on disk `/uploads/labels` (prod S3 = Restoration bucket)',
       'Packing Station: scan + photo + role lock',
       'Buy Sheet → Draft PO API',
     ],
@@ -753,7 +757,7 @@ export const SHIPPED = [
     items: [
       'Helmet + rate limits + CORS_ORIGINS',
       'Ops runbook (JWT rotate, Atlas restore steps)',
-      'This Workflow page: passwords, client needs, full test flow',
+      'This Workflow page: logins, what is left, review walkthrough',
     ],
   },
 ]
@@ -779,9 +783,9 @@ export const DEMO_LOGINS = [
 ]
 
 /**
- * Client review card — har department ka 1 demo user:
- * kya dikhega, kya CRUD kar sakta hai, kya blocked.
- * Password sabke liye DEMO_PASSWORD.
+ * One demo user per department for Restoration review:
+ * menus visible, CRUD allowed, and blocked areas.
+ * Shared password: DEMO_PASSWORD.
  */
 export type DeptUserGuide = {
   department: string
@@ -819,7 +823,7 @@ export const DEPARTMENT_USERS: DeptUserGuide[] = [
       'Buy Sheet → Draft PO',
     ],
     cannot: ['Nothing blocked inside own tenant (except other tenants’ private data)'],
-    reviewTip: 'Primary client demo login — walk Full flow test §1–6.',
+    reviewTip: 'Primary Restoration demo login — walk the full test flow (sections 1–6).',
   },
   {
     department: 'India Warehouse / Mill',
@@ -858,7 +862,7 @@ export const DEPARTMENT_USERS: DeptUserGuide[] = [
       'Tenants / Users admin',
       'Sales Buyers-only screens if not in menu',
     ],
-    reviewTip: 'Login → Packing wrong SKU must fail → correct SKU packs → Shipping buy label.',
+    reviewTip: 'Sign in → Packing: wrong SKU must fail → correct SKU packs → Shipping: buy label.',
   },
   {
     department: 'USA 3PL Warehouse',
@@ -937,7 +941,7 @@ export const DEPARTMENT_USERS: DeptUserGuide[] = [
     ],
     specialActions: ['View Billing plan (Super Admin switches plan)'],
     cannot: ['Packing Station', 'Tenants', 'Users', 'Inventory CRUD (no menu)'],
-    reviewTip: 'Add Receivable → Edit → Delete. Confirm /packing redirects home.',
+    reviewTip: 'Add a receivable → Edit → Delete. Opening /packing should redirect home.',
   },
   {
     department: 'Sales / Marketplace',
@@ -954,7 +958,7 @@ export const DEPARTMENT_USERS: DeptUserGuide[] = [
     ],
     specialActions: ['Create marketplace-style order manually for demo'],
     cannot: ['Shipping Desk', 'Packing', 'Finance reports', 'Tenants'],
-    reviewTip: 'Orders → Add order → Edit status → Delete test row. Buyers same.',
+    reviewTip: 'Orders → Add → Edit status → Delete a test row. Repeat for Buyers.',
   },
   {
     department: 'Planning / SCM',
@@ -979,7 +983,7 @@ export const DEPARTMENT_USERS: DeptUserGuide[] = [
     ],
     specialActions: ['Buy Sheet → Create Draft PO (multi-line)'],
     cannot: ['Packing / Shipping ops floor', 'Tenants / Users'],
-    reviewTip: 'Buy Sheet add 2 SKUs → Draft PO → open Purchase Orders → Edit PO.',
+    reviewTip: 'Buy Sheet: add 2 SKUs → create Draft PO → open Purchase Orders → Edit the PO.',
   },
   {
     department: 'Statutory Auditor',
@@ -1004,7 +1008,7 @@ export const DEPARTMENT_USERS: DeptUserGuide[] = [
     ],
     specialActions: ['Review audit trail / reports for compliance'],
     cannot: ['Any create / update / delete', 'Packing', 'Users', 'Tenants'],
-    reviewTip: 'Open Receivables — only View. Try Add (should be absent).',
+    reviewTip: 'Open Receivables — View only. Add / Edit / Delete controls should be hidden.',
   },
   {
     department: 'Tenant B (isolation demo)',
@@ -1022,7 +1026,7 @@ export const DEPARTMENT_USERS: DeptUserGuide[] = [
     ],
     specialActions: ['Prove SaaS isolation vs Restoration tenant'],
     cannot: ['See Restoration Rugs catalog / orders'],
-    reviewTip: 'Compare inventory count with admin@ctasinfo.com — must differ.',
+    reviewTip: 'Compare inventory with admin@ctasinfo.com — catalogs must differ (tenant isolation).',
   },
 ]
 
@@ -1188,7 +1192,7 @@ export const DEV_ROADMAP: DevPhase[] = [
     phase: 2,
     code: 'P2',
     title: 'Multi-tenant SaaS core',
-    plain: 'Many client companies on one app. Data never leaks across tenants.',
+    plain: 'Many Restoration-style companies on one app. Data never leaks across tenants.',
     whyOrder: 'Needed before selling RugOS; must exist before billing.',
     epics: [
       {
@@ -1213,8 +1217,8 @@ export const DEV_ROADMAP: DevPhase[] = [
       {
         id: 'p2-onboarding',
         title: 'Tenant onboarding & company switcher',
-        plain: 'Create a new client company; invite first admin; optional brand name/logo.',
-        outcome: 'Ops can spin up a new SaaS client in minutes.',
+        plain: 'Create a new company; invite first admin; optional brand name/logo.',
+        outcome: 'Ops can spin up a new SaaS company in minutes.',
         dependsOn: ['p2-isolation'],
         estimateDays: 5,
         menusTouched: ['/company', '/tenants'],
@@ -1268,7 +1272,7 @@ export const DEV_ROADMAP: DevPhase[] = [
         estimateDays: 5,
         menusTouched: ['/integrations', '/failed-jobs'],
         acceptance: [
-          'Encrypted secrets store (not plain .env for client keys)',
+          'Encrypted secrets store (not plain .env for company keys)',
           'Worker heartbeat + last sync time in DB',
           'Failed job retry from UI works',
         ],
@@ -1292,9 +1296,9 @@ export const DEV_ROADMAP: DevPhase[] = [
           'Mapping exceptions list when SKU not found',
         ],
         tasks: [
-          { id: 'p3-s1', title: 'Shopify OAuth / Admin API client (needs client store keys)', side: 'backend' },
+          { id: 'p3-s1', title: 'Shopify OAuth / Admin API (needs Restoration store keys)', side: 'backend' },
           { id: 'p3-s2', title: 'Order ingest → normalize to AppState/API order shape', side: 'backend', done: true },
-          { id: 'p3-s3', title: 'Inventory push job + UI mapping table (needs client keys)', side: 'both' },
+          { id: 'p3-s3', title: 'Inventory push job + UI mapping table (needs Restoration keys)', side: 'both' },
         ],
       },
       {
@@ -1311,7 +1315,7 @@ export const DEV_ROADMAP: DevPhase[] = [
           'Manual “Sync now” button',
         ],
         tasks: [
-          { id: 'p3-am1', title: 'SP-API auth + orders list client (needs client Amazon keys)', side: 'backend' },
+          { id: 'p3-am1', title: 'SP-API auth + orders list (needs Restoration Amazon keys)', side: 'backend' },
           { id: 'p3-am2', title: 'Normalize Amazon order → RugOS order', side: 'backend', done: true },
           { id: 'p3-am3', title: 'UI status + last error on Integrations', side: 'frontend', done: true },
         ],
@@ -1343,7 +1347,7 @@ export const DEV_ROADMAP: DevPhase[] = [
           { id: 'p4-c1', title: 'Carrier adapter interface (FedEx first)', side: 'backend', done: true },
           { id: 'p4-c2', title: 'Ship / label / track endpoints tenant-scoped', side: 'backend', done: true },
           { id: 'p4-c3', title: 'Shipping UI: Rate → Buy label → Print', side: 'frontend', done: true },
-          { id: 'p4-c4', title: 'Store labels locally (/uploads); S3 when client provides bucket', side: 'ops', done: true },
+          { id: 'p4-c4', title: 'Store labels locally (/uploads); S3 when Restoration provides bucket', side: 'ops', done: true },
         ],
       },
       {
@@ -1397,7 +1401,7 @@ export const DEV_ROADMAP: DevPhase[] = [
         id: 'p5-secure',
         title: 'Security & compliance checklist',
         plain: 'Rate limits, HTTPS only, secrets rotation, audit logs retained.',
-        outcome: 'Pass basic pen-test / client security questionnaire.',
+        outcome: 'Pass basic pen-test / Restoration security questionnaire.',
         dependsOn: ['p2-billing', 'p3-connectors'],
         estimateDays: 4,
         menusTouched: ['/system-logs'],

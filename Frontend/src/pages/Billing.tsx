@@ -91,8 +91,8 @@ export function Billing() {
         </p>
         <h1 className="text-2xl font-extrabold text-[var(--text-main)]">Plan & subscription</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Module entitlements tenant pe store hote hain. Payment gateway (Stripe/Razorpay) next —
-          abhi demo plan switch.
+          Module entitlements are stored per company. Live payment gateway (Stripe/Razorpay) waits on
+          Restoration keys — demo plan switch works now.
         </p>
       </header>
 
