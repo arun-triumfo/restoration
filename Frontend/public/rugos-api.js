@@ -1,21 +1,40 @@
 /**
- * RugOS Phase-1 API client — SKUs + Orders against Node/Mongo backend.
- * Direct backend URL (CORS enabled). Override with window.RUGOS_API_BASE if needed.
+ * RugOS wireframe ApiClient — uses same auth token + API base as React app.
  */
 const ApiClient = (() => {
-  const BASE = (typeof window !== 'undefined' && window.RUGOS_API_BASE) || 'http://localhost:5000/api'
+  function resolveBase() {
+    if (typeof window !== 'undefined' && window.RUGOS_API_BASE) {
+      return String(window.RUGOS_API_BASE).replace(/\/$/, '')
+    }
+    const host = typeof window !== 'undefined' ? window.location.hostname : ''
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return 'https://restoration-b.onrender.com/api'
+    }
+    return '/api'
+  }
+
+  function authHeaders() {
+    const headers = { Accept: 'application/json' }
+    try {
+      const t = localStorage.getItem('rugos-auth-token')
+      if (t) headers.Authorization = `Bearer ${t}`
+    } catch {
+      /* ignore */
+    }
+    return headers
+  }
 
   async function request(method, path, body) {
     const opts = {
       method,
-      headers: { Accept: 'application/json' },
+      headers: authHeaders(),
     }
     if (body !== undefined) {
       opts.headers['Content-Type'] = 'application/json'
       opts.body = JSON.stringify(body)
     }
 
-    const res = await fetch(`${BASE}${path}`, opts)
+    const res = await fetch(`${resolveBase()}${path}`, opts)
     let payload = null
     try {
       payload = await res.json()

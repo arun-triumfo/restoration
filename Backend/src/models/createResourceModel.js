@@ -22,8 +22,10 @@ export function getResourceModel(resourceName, idField, unique = true) {
     },
   )
 
+  schema.index({ tenantId: 1 })
   if (idField) {
-    schema.index({ [idField]: 1 }, { unique: !!unique, sparse: true })
+    // Unique per tenant when possible (sparse allows missing keys on legacy rows)
+    schema.index({ tenantId: 1, [idField]: 1 }, { unique: !!unique, sparse: true })
   }
 
   const model =

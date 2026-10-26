@@ -1,5 +1,6 @@
 import { RESOURCES } from '../resources.js'
 import { getResourceModel } from '../models/createResourceModel.js'
+import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
 
 function modelFor(resource) {
   const meta = RESOURCES[resource]
@@ -10,15 +11,34 @@ function recordId(req) {
   return req.params.recordId ?? req.params.id
 }
 
+function tenantIdOf(req) {
+  return req.user?.tenantId || DEFAULT_TENANT_ID
+}
+
+/** Scope filter: match tenant OR legacy docs without tenantId (treated as default tenant) */
+function tenantFilter(req) {
+  const tid = tenantIdOf(req)
+  if (tid === DEFAULT_TENANT_ID) {
+    return {
+      $or: [{ tenantId: tid }, { tenantId: { $exists: false } }, { tenantId: null }],
+    }
+  }
+  return { tenantId: tid }
+}
+
+function withTenant(req, payload) {
+  return { ...payload, tenantId: tenantIdOf(req) }
+}
+
 export function listResource(resource) {
   return async (req, res) => {
     try {
       const { search = '' } = req.query
       const Model = modelFor(resource)
-      let filter = {}
+      const parts = [tenantFilter(req)]
       if (search) {
         const q = String(search).trim()
-        filter = {
+        parts.push({
           $or: [
             { [RESOURCES[resource].idField]: new RegExp(q, 'i') },
             { title: new RegExp(q, 'i') },
@@ -26,11 +46,18 @@ export function listResource(resource) {
             { status: new RegExp(q, 'i') },
             { buyerName: new RegExp(q, 'i') },
             { channel: new RegExp(q, 'i') },
+            { email: new RegExp(q, 'i') },
           ],
-        }
+        })
       }
+      const filter = parts.length === 1 ? parts[0] : { $and: parts }
       const data = await Model.find(filter).sort({ updatedAt: -1 }).lean()
-      res.json({ success: true, resource, count: data.length, data })
+      // Never leak password hashes
+      const cleaned = data.map((row) => {
+        const { passwordHash, ...rest } = row
+        return rest
+      })
+      res.json({ success: true, resource, count: cleaned.length, data: cleaned })
     } catch (err) {
       res.status(500).json({ success: false, message: err.message })
     }
@@ -46,9 +73,12 @@ export function getResource(resource) {
         return res.status(400).json({ success: false, message: 'Record id required' })
       }
       const Model = modelFor(resource)
-      const data = await Model.findOne({ [idField]: id }).lean()
+      const data = await Model.findOne({
+        $and: [tenantFilter(req), { [idField]: id }],
+      }).lean()
       if (!data) return res.status(404).json({ success: false, message: 'Not found' })
-      res.json({ success: true, data })
+      const { passwordHash, ...rest } = data
+      res.json({ success: true, data: rest })
     } catch (err) {
       res.status(500).json({ success: false, message: err.message })
     }
@@ -60,17 +90,22 @@ export function createResource(resource) {
     try {
       const idField = RESOURCES[resource].idField
       const Model = modelFor(resource)
-      const payload = req.body || {}
+      const payload = withTenant(req, req.body || {})
+      delete payload.passwordHash
       const key = payload[idField]
       if (key === undefined || key === null || key === '') {
         return res.status(400).json({ success: false, message: `${idField} is required` })
       }
-      const exists = await Model.findOne({ [idField]: key })
+      const exists = await Model.findOne({
+        $and: [tenantFilter(req), { [idField]: key }],
+      })
       if (exists) {
         return res.status(409).json({ success: false, message: 'Record already exists' })
       }
       const created = await Model.create(payload)
-      res.status(201).json({ success: true, data: created })
+      const obj = created.toObject ? created.toObject() : created
+      delete obj.passwordHash
+      res.status(201).json({ success: true, data: obj })
     } catch (err) {
       res.status(500).json({ success: false, message: err.message })
     }
@@ -91,16 +126,18 @@ export function updateResource(resource) {
       delete body.__v
       delete body.createdAt
       delete body.updatedAt
-      // Never allow business key rewrite via body on update URL
+      delete body.passwordHash
+      delete body.tenantId
       if (body[idField] !== undefined && String(body[idField]) !== String(id)) {
         delete body[idField]
       }
       const updated = await Model.findOneAndUpdate(
-        { [idField]: id },
+        { $and: [tenantFilter(req), { [idField]: id }] },
         { $set: body },
         { new: true },
-      )
+      ).lean()
       if (!updated) return res.status(404).json({ success: false, message: 'Not found' })
+      delete updated.passwordHash
       res.json({ success: true, data: updated })
     } catch (err) {
       res.status(500).json({ success: false, message: err.message })
@@ -117,9 +154,11 @@ export function deleteResource(resource) {
         return res.status(400).json({ success: false, message: 'Record id required' })
       }
       const Model = modelFor(resource)
-      const deleted = await Model.findOneAndDelete({ [idField]: id })
+      const deleted = await Model.findOneAndDelete({
+        $and: [tenantFilter(req), { [idField]: id }],
+      })
       if (!deleted) return res.status(404).json({ success: false, message: 'Not found' })
-      res.json({ success: true, message: 'Deleted', data: deleted })
+      res.json({ success: true, message: 'Deleted' })
     } catch (err) {
       res.status(500).json({ success: false, message: err.message })
     }

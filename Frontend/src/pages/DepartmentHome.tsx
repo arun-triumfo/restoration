@@ -1,0 +1,336 @@
+import {
+  ArrowRight,
+  Bell,
+  Boxes,
+  Factory,
+  Package,
+  ShoppingBag,
+  TrendingUp,
+  Truck,
+  Wallet,
+} from 'lucide-react'
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { useData } from '../context/DataContext'
+
+type Card = { label: string; value: string; hint: string; to: string; icon: typeof Package }
+
+export function DepartmentHome() {
+  const { user } = useAuth()
+  const { list, loading } = useData()
+  const role = user?.roleCode || 'auditor'
+
+  const cards = useMemo((): Card[] => {
+    const orders = list('orders')
+    const alerts = list('alerts').filter((a) => !a.resolved)
+    const skus = list('skus')
+    const pos = list('purchase_orders')
+    const transfers = list('replenishment')
+
+    const pendingOrders = orders.filter((o) =>
+      String(o.status || '')
+        .toLowerCase()
+        .includes('pending'),
+    ).length
+
+    const base: Record<string, Card[]> = {
+      super_admin: [
+        {
+          label: 'Open alerts',
+          value: String(alerts.length),
+          hint: 'Needs attention across ops',
+          to: '/alerts',
+          icon: Bell,
+        },
+        {
+          label: 'Orders in pipeline',
+          value: String(orders.length),
+          hint: `${pendingOrders} pending allocation`,
+          to: '/orders',
+          icon: ShoppingBag,
+        },
+        {
+          label: 'SKU catalog',
+          value: String(skus.length),
+          hint: 'Global inventory master',
+          to: '/inventory',
+          icon: Package,
+        },
+        {
+          label: 'Demand forecast',
+          value: 'Workbench',
+          hint: 'Plan next buy sheet',
+          to: '/forecast',
+          icon: TrendingUp,
+        },
+      ],
+      india_wh: [
+        {
+          label: 'MTO / PO work',
+          value: String(pos.length),
+          hint: 'Weaving & packing queue',
+          to: '/mto',
+          icon: Factory,
+        },
+        {
+          label: 'Stock transfers',
+          value: String(transfers.length),
+          hint: 'India → USA moves',
+          to: '/stock-transfers',
+          icon: Truck,
+        },
+        {
+          label: 'Inventory',
+          value: String(skus.length),
+          hint: 'India free stock',
+          to: '/inventory',
+          icon: Boxes,
+        },
+        {
+          label: 'Alerts',
+          value: String(alerts.length),
+          hint: 'Stock & SLA',
+          to: '/alerts',
+          icon: Bell,
+        },
+      ],
+      usa_wh: [
+        {
+          label: 'Receive transfers',
+          value: String(transfers.length),
+          hint: 'Confirm inbound GRN',
+          to: '/stock-transfers',
+          icon: Truck,
+        },
+        {
+          label: 'Orders to pick',
+          value: String(pendingOrders || orders.length),
+          hint: 'Marketplace fulfillment',
+          to: '/orders',
+          icon: ShoppingBag,
+        },
+        {
+          label: 'USA inventory',
+          value: String(skus.length),
+          hint: 'Edison + FBA view',
+          to: '/inventory',
+          icon: Package,
+        },
+        {
+          label: 'Returns inbound',
+          value: 'RMA',
+          hint: 'Grade & restock',
+          to: '/returns',
+          icon: Boxes,
+        },
+      ],
+      finance: [
+        {
+          label: 'Receivables',
+          value: 'Aging',
+          hint: 'FEMA / e-BRC clock',
+          to: '/receivables',
+          icon: Wallet,
+        },
+        {
+          label: 'Profitability',
+          value: 'True cost',
+          hint: 'After courier actuals',
+          to: '/profitability',
+          icon: TrendingUp,
+        },
+        {
+          label: 'Courier audit',
+          value: 'Disputes',
+          hint: 'Weight / rate variance',
+          to: '/courier-audit',
+          icon: Bell,
+        },
+        {
+          label: 'Reports',
+          value: 'Hub',
+          hint: 'Compliance exports',
+          to: '/reports',
+          icon: Boxes,
+        },
+      ],
+      logistics: [
+        {
+          label: 'Shipping',
+          value: 'Dispatch',
+          hint: 'Loading plans & AWB',
+          to: '/shipping',
+          icon: Truck,
+        },
+        {
+          label: 'Courier audit',
+          value: 'Variance',
+          hint: 'Overcharge watch',
+          to: '/courier-audit',
+          icon: Bell,
+        },
+        {
+          label: 'Export docs',
+          value: 'Suite',
+          hint: 'Invoice & packing list',
+          to: '/export-docs',
+          icon: Package,
+        },
+        {
+          label: 'Transfers',
+          value: String(transfers.length),
+          hint: 'In-transit freight',
+          to: '/stock-transfers',
+          icon: Boxes,
+        },
+      ],
+      sales: [
+        {
+          label: 'Orders',
+          value: String(orders.length),
+          hint: `${pendingOrders} need allocation`,
+          to: '/orders',
+          icon: ShoppingBag,
+        },
+        {
+          label: 'Buyers',
+          value: 'B2B',
+          hint: 'Wholesale accounts',
+          to: '/buyers',
+          icon: Boxes,
+        },
+        {
+          label: 'Returns',
+          value: 'RMA',
+          hint: 'Claims & refunds',
+          to: '/returns',
+          icon: Package,
+        },
+        {
+          label: 'Alerts',
+          value: String(alerts.length),
+          hint: 'SLA breaches',
+          to: '/alerts',
+          icon: Bell,
+        },
+      ],
+      scm: [
+        {
+          label: 'Forecast',
+          value: 'Buy sheet',
+          hint: 'What to order today',
+          to: '/forecast',
+          icon: TrendingUp,
+        },
+        {
+          label: 'Alerts',
+          value: String(alerts.length),
+          hint: 'Low stock sentinels',
+          to: '/alerts',
+          icon: Bell,
+        },
+        {
+          label: 'Purchase orders',
+          value: String(pos.length),
+          hint: 'Open replenishment',
+          to: '/purchase-orders',
+          icon: Factory,
+        },
+        {
+          label: 'Inventory',
+          value: String(skus.length),
+          hint: 'Cover & velocity',
+          to: '/inventory',
+          icon: Package,
+        },
+      ],
+      auditor: [
+        {
+          label: 'System logs',
+          value: 'Audit',
+          hint: 'Who changed what',
+          to: '/system-logs',
+          icon: Bell,
+        },
+        {
+          label: 'Reports',
+          value: 'Read-only',
+          hint: 'Compliance packs',
+          to: '/reports',
+          icon: Boxes,
+        },
+        {
+          label: 'Courier audit',
+          value: 'Review',
+          hint: 'Dispute trail',
+          to: '/courier-audit',
+          icon: Truck,
+        },
+        {
+          label: 'Receivables',
+          value: 'Aging',
+          hint: 'Export realization',
+          to: '/receivables',
+          icon: Wallet,
+        },
+      ],
+    }
+
+    return base[role] || base.auditor
+  }, [list, role])
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <section className="rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] px-5 py-6">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+          My day · {user?.role}
+        </p>
+        <h1 className="mt-1 text-2xl font-extrabold text-[var(--text-main)]">
+          Welcome, {user?.name?.split(' ')[0] || 'teammate'}
+        </h1>
+        <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+          Ye aapke role ke liye short home hai. Neeche cards se seedha kaam shuru karein — poora menu
+          left sidebar mein hai (sirf allowed items).
+        </p>
+        {loading ? (
+          <p className="mt-3 text-xs text-[var(--text-dim)]">Loading live counts…</p>
+        ) : null}
+      </section>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {cards.map((c) => {
+          const Icon = c.icon
+          return (
+            <Link
+              key={c.to + c.label}
+              to={c.to}
+              className="group rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 no-underline transition hover:border-indigo-400 hover:shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <ArrowRight className="h-4 w-4 text-[var(--text-dim)] transition group-hover:text-indigo-500" />
+              </div>
+              <div className="mt-3 font-mono text-2xl font-extrabold text-[var(--text-main)]">
+                {c.value}
+              </div>
+              <div className="text-sm font-bold text-[var(--text-main)]">{c.label}</div>
+              <div className="text-[12px] text-[var(--text-muted)]">{c.hint}</div>
+            </Link>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Link
+          to="/workflow"
+          className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-700 no-underline dark:text-indigo-300"
+        >
+          Open System Workflow / Build roadmap
+        </Link>
+      </div>
+    </div>
+  )
+}

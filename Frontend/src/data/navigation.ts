@@ -7,9 +7,11 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
       { label: 'System Workflow', path: '/workflow', icon: 'GitBranch' },
       { label: 'Demand Forecast', path: '/forecast', icon: 'TrendingUp' },
+      { label: 'Buy Sheet → PO', path: '/buy-sheet', icon: 'FileText' },
       { label: 'Automation & Alerts', path: '/alerts', icon: 'Bell' },
       { label: 'Integrations', path: '/integrations', icon: 'Zap' },
       { label: 'Failed Jobs', path: '/failed-jobs', icon: 'AlertTriangle' },
+      { label: 'Billing', path: '/billing', icon: 'CreditCard' },
     ],
   },
   {
@@ -34,7 +36,8 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'SHIPPING & EXPORT',
     items: [
-      { label: 'Shipping & Dispatch', path: '/shipping', icon: 'Truck' },
+      { label: 'Shipping Desk', path: '/shipping', icon: 'Truck' },
+      { label: 'Packing Station', path: '/packing', icon: 'Package' },
       { label: 'Loading Plans', path: '/loading-plans', icon: 'Container' },
       { label: 'Export Docs', path: '/export-docs', icon: 'FileCheck' },
     ],
@@ -53,6 +56,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'ADMINISTRATION & MASTERS',
     items: [
       { label: 'Company', path: '/company', icon: 'Building2' },
+      { label: 'Tenants', path: '/tenants', icon: 'Building2' },
       { label: 'Users & RBAC', path: '/users', icon: 'Users' },
       { label: 'Buyers', path: '/buyers', icon: 'Briefcase' },
       { label: 'Looms', path: '/looms', icon: 'Hammer' },

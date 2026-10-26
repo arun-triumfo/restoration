@@ -4,6 +4,7 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Pagination } from '../components/ui/Pagination'
+import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import type { ColumnDef, ResourceMeta } from '../data/resources'
 import type { ResourceRow } from '../api/client'
@@ -55,8 +56,13 @@ function formToPayload(
 }
 
 export function ResourcePage({ meta }: { meta: ResourceMeta }) {
+  const { user } = useAuth()
   const { list, create, update, remove, getId, loading, error } = useData()
   const rows = list(meta.key)
+  const canWrite =
+    user?.roleCode === 'super_admin' ||
+    Boolean(user?.permissions?.actions?.includes('write')) ||
+    (user?.roleCode !== 'auditor' && user?.roleCode !== undefined)
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -132,10 +138,20 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">{meta.subtitle}</p>
         </div>
-        <Button variant="primary" size="sm" onClick={openCreate}>
-          <Plus className="h-3.5 w-3.5" /> Add {meta.label.replace(/s$/, '')}
-        </Button>
+        {canWrite ? (
+          <Button variant="primary" size="sm" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" /> Add {meta.label.replace(/s$/, '')}
+          </Button>
+        ) : (
+          <span className="rounded-full border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2.5 py-1 text-[10px] font-bold uppercase text-[var(--text-dim)]">
+            Read only
+          </span>
+        )}
       </div>
+      <p className="text-[11px] text-[var(--text-dim)]">
+        Live Mongo CRUD{canWrite ? ' — Add / Edit / Delete' : ' — view only for your role'} · tenant{' '}
+        <code>{user?.tenantId}</code>
+      </p>
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -190,19 +206,23 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
                       </td>
                     ))}
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" aria-label="Edit" onClick={() => openEdit(row)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label="Delete"
-                          onClick={() => setDeleteId(id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                        </Button>
-                      </div>
+                      {canWrite ? (
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" aria-label="Edit" onClick={() => openEdit(row)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Delete"
+                            onClick={() => setDeleteId(id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-[var(--text-dim)]">View</span>
+                      )}
                     </td>
                   </tr>
                 )

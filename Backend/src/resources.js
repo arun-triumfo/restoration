@@ -3,6 +3,7 @@
  * idField = unique business key used in URLs and upserts.
  */
 export const RESOURCES = {
+  tenants: { idField: 'id', label: 'Tenants' },
   skus: { idField: 'sku', label: 'SKUs' },
   orders: { idField: 'orderId', label: 'Orders' },
   warehouses: { idField: 'id', label: 'Warehouses' },
@@ -15,10 +16,12 @@ export const RESOURCES = {
   loading_plans: { idField: 'planId', label: 'Loading Plans' },
   export_docs: { idField: 'invoiceNo', label: 'Export Docs' },
   shipments: { idField: 'awb', label: 'Shipments' },
+  packing_events: { idField: 'id', label: 'Packing Events' },
   raw_materials: { idField: 'lotNo', label: 'Raw Materials' },
   alerts: { idField: 'id', label: 'Alerts' },
   automations: { idField: 'id', label: 'Automations' },
   integration_workers: { idField: 'id', label: 'Integrations' },
+  integration_credentials: { idField: 'id', label: 'Integration Credentials' },
   failed_jobs: { idField: 'jobId', label: 'Failed Jobs' },
   monthly_financials: { idField: 'period', label: 'Monthly Financials' },
   yearly_financials: { idField: 'period', label: 'Yearly Financials' },

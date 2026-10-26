@@ -32,8 +32,11 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react'
+import { useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
+import { canAccessPath } from '../../auth/roles'
 import { useApp } from '../../context/AppContext'
+import { useAuth } from '../../context/AuthContext'
 import { NAV_SECTIONS } from '../../data/navigation'
 
 const ICONS: Record<string, LucideIcon> = {
@@ -72,6 +75,17 @@ const ICONS: Record<string, LucideIcon> = {
 
 export function Sidebar() {
   const { sidebarCollapsed, mobileNavOpen, setMobileNavOpen } = useApp()
+  const { user } = useAuth()
+
+  const sections = useMemo(() => {
+    const tenant = user?.tenant
+      ? { modules: user.tenant.modules, plan: user.tenant.plan }
+      : undefined
+    return NAV_SECTIONS.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccessPath(user?.roleCode, item.path, tenant)),
+    })).filter((section) => section.items.length > 0)
+  }, [user?.roleCode, user?.tenant])
 
   return (
     <>
@@ -95,7 +109,7 @@ export function Sidebar() {
           className="rugos-sidebar-nav flex-1 overflow-y-auto overscroll-contain px-2.5 py-3"
           aria-label="Primary"
         >
-          {NAV_SECTIONS.map((section) => (
+          {sections.map((section) => (
             <div key={section.title} className="mb-4">
               <div
                 className={`mb-2 flex items-center gap-2 px-2.5 ${
