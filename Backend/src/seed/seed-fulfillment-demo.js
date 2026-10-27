@@ -134,7 +134,7 @@ const ORDER_SPECS = [
     channel: 'Direct Offline',
     marketplaceOrderId: 'OFF-DEMO-D-001',
     buyerName: 'Client Test — Offline / Finance',
-    shippingAddress: 'Jaipur Showroom Pickup → US consignee later',
+    shippingAddress: 'Direct client — ship via US Warehouse when ready',
     sku: 'SKU-DEMO-OFFLINE',
     qty: 1,
     totalOrderUSD: 720,

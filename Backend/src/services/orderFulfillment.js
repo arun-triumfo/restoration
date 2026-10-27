@@ -57,9 +57,10 @@ export function decideFulfillment(order, sku) {
       ...base,
       fulfillmentScenario: SCENARIO.US_STOCK,
       status: 'Pending Allocation',
-      fulfillmentWh: 'USA 3PL — Edison NJ',
-      stockAllocation: 'US Available — barcode pending (India)',
-      routingNote: `US stock ${usa} ≥ qty ${qty}. India manager generates barcode, then order moves to US bucket.`,
+      fulfillmentWh: 'US Warehouse',
+      stockAt: 'US Warehouse',
+      stockAllocation: 'US stock available — send barcode to US',
+      routingNote: `US Warehouse has ${usa} (≥ qty ${qty}). Next: India generates barcode → order goes to US Warehouse queue.`,
     }
   }
 
@@ -68,9 +69,10 @@ export function decideFulfillment(order, sku) {
       ...base,
       fulfillmentScenario: SCENARIO.INDIA_SHIP,
       status: 'Pending Allocation',
-      fulfillmentWh: 'India Mill — Jaipur',
-      stockAllocation: 'India Available — ship to US',
-      routingNote: `US short (${usa}). India stock ${india} ≥ qty ${qty}. India ships to US (photo, barcode, weight / Aramex).`,
+      fulfillmentWh: 'India Warehouse',
+      stockAt: 'India Warehouse',
+      stockAllocation: 'India stock available — ship to US Warehouse',
+      routingNote: `US Warehouse short (${usa}). India Warehouse has ${india} (≥ qty ${qty}). Next: ship India → US.`,
     }
   }
 
@@ -82,11 +84,12 @@ export function decideFulfillment(order, sku) {
     ...base,
     fulfillmentScenario: SCENARIO.MAKE,
     status: 'In Process',
-    fulfillmentWh: 'India Mill — Production',
-    stockAllocation: 'Make / MTO',
+    fulfillmentWh: 'India Warehouse',
+    stockAt: 'Not in stock',
+    stockAllocation: 'No stock — make / weave',
     mtoNeeded: true,
     expectedWarehouseDeliveryDate: eta,
-    routingNote: `No US (${usa}) or India (${india}) stock for qty ${qty}. Marked In Process with ETA ${eta}.`,
+    routingNote: `No stock in US (${usa}) or India (${india}) for qty ${qty}. In Process until ready. ETA ${eta}.`,
   }
 }
 
@@ -116,6 +119,7 @@ export async function routeNewOrderPayload(payload, tenantId) {
     ...payload,
     status: decision.status,
     fulfillmentWh: decision.fulfillmentWh,
+    stockAt: decision.stockAt,
     stockAllocation: decision.stockAllocation,
     fulfillmentScenario: decision.fulfillmentScenario,
     queueOwner: decision.queueOwner,
@@ -134,6 +138,7 @@ export async function reRouteOrder(order, tenantId) {
   return {
     status: decision.status,
     fulfillmentWh: decision.fulfillmentWh,
+    stockAt: decision.stockAt,
     stockAllocation: decision.stockAllocation,
     fulfillmentScenario: decision.fulfillmentScenario,
     queueOwner: 'india_wh',
@@ -171,12 +176,13 @@ export function applyBarcodeAndSendToUs(order) {
       barcodeGenerated: true,
       queueOwner: 'usa_wh',
       status: 'Pending Allocation',
-      fulfillmentWh: 'USA 3PL — Edison NJ',
-      stockAllocation: 'Locked — US bucket',
+      fulfillmentWh: 'US Warehouse',
+      stockAt: 'US Warehouse',
+      stockAllocation: 'Locked — ready to pack at US Warehouse',
       history: pushHistory(
         order,
-        'Barcode → US bucket',
-        `India generated barcode ${barcode}. Order added to US Warehouse Manager queue for pack & dispatch.`,
+        'Barcode → US Warehouse',
+        `Barcode ${barcode} generated. Order is now in the US Warehouse queue for pack & dispatch to customer.`,
       ),
     },
   }
@@ -191,8 +197,9 @@ export function applyShipIndiaToUs(order) {
     patch: {
       queueOwner: 'india_wh',
       status: 'In Transit',
-      fulfillmentWh: 'India → USA transfer',
-      stockAllocation: 'In transit to US',
+      fulfillmentWh: 'In transit India → US',
+      stockAt: 'In transit',
+      stockAllocation: 'In transit to US Warehouse',
       fulfillmentScenario: order.fulfillmentScenario || SCENARIO.INDIA_SHIP,
       barcodeGenerated: true,
       barcode:
@@ -201,7 +208,7 @@ export function applyShipIndiaToUs(order) {
       history: pushHistory(
         order,
         'India → US shipment',
-        'Pre-dispatch: photo / barcode / weight logged. Shipment dispatched to US warehouse (Aramex).',
+        'Shipped from India Warehouse to US Warehouse (photo / barcode / weight logged).',
       ),
     },
   }
@@ -213,9 +220,14 @@ export function applyUsReceive(order) {
     patch: {
       queueOwner: 'usa_wh',
       status: 'Pending Allocation',
-      fulfillmentWh: 'USA 3PL — Edison NJ',
-      stockAllocation: 'Received — ready to pack',
-      history: pushHistory(order, 'US received', 'Transfer received at US warehouse. Ready to pack & dispatch to customer.'),
+      fulfillmentWh: 'US Warehouse',
+      stockAt: 'US Warehouse',
+      stockAllocation: 'Received at US Warehouse — ready to pack',
+      history: pushHistory(
+        order,
+        'US received',
+        'Received at US Warehouse. Ready to pack & dispatch to customer.',
+      ),
     },
   }
 }
@@ -228,14 +240,15 @@ export function applyProductionComplete(order) {
       status: 'Pending Allocation',
       fulfillmentScenario: SCENARIO.INDIA_SHIP,
       mtoNeeded: false,
-      stockAllocation: 'Produced — ship to US',
-      fulfillmentWh: 'India Mill — Jaipur',
+      stockAllocation: 'Ready at India Warehouse — ship to US',
+      fulfillmentWh: 'India Warehouse',
+      stockAt: 'India Warehouse',
       queueOwner: 'india_wh',
       expectedWarehouseDeliveryDate: order.expectedWarehouseDeliveryDate || etaDone,
       history: pushHistory(
         order,
         'Production complete',
-        'Manufacturing done. Barcode / QC next, then dispatch India → US.',
+        'Item ready at India Warehouse. Next: ship India → US Warehouse.',
       ),
     },
   }
