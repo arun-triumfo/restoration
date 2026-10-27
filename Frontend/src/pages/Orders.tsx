@@ -4,7 +4,7 @@ import {
   Package,
   Pencil,
   Plus,
-  RotateCcw,
+  RefreshCw,
   Search,
   Trash2,
   Truck,
@@ -82,6 +82,7 @@ export function Orders() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [viewOrder, setViewOrder] = useState<ResourceRow | null>(null)
   const [saving, setSaving] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
 
@@ -427,7 +428,10 @@ export function Orders() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {canIndiaAct && scenario === 'US_STOCK' && !order.barcodeGenerated ? (
+                        {canIndiaAct &&
+                        (scenario === 'US_STOCK' ||
+                          String(order.stockAllocation || '').toLowerCase().includes('us available')) &&
+                        !order.barcodeGenerated ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -483,24 +487,45 @@ export function Orders() {
                             <Package className="h-3.5 w-3.5 text-emerald-600" />
                           </Button>
                         ) : null}
-                        <Button variant="ghost" size="sm" aria-label={`View ${oid}`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="View order details"
+                          aria-label={`View ${oid}`}
+                          onClick={() => setViewOrder(order)}
+                        >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           aria-label={`Edit ${oid}`}
+                          title="Edit order"
                           onClick={() => openEdit(order)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" aria-label={`Return ${oid}`}>
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </Button>
+                        {(canIndiaAct || role === 'super_admin') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Re-check stock / reload routing"
+                            aria-label={`Reload routing ${oid}`}
+                            disabled={!!busyAction}
+                            onClick={() =>
+                              runAction(`rr-${oid}`, () => api.fulfillment.reRoute([oid]))
+                            }
+                          >
+                            <RefreshCw
+                              className={`h-3.5 w-3.5 ${busyAction === `rr-${oid}` ? 'animate-spin' : ''}`}
+                            />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
                           aria-label={`Delete ${oid}`}
+                          title="Delete order"
                           onClick={() => setDeleteId(oid)}
                         >
                           <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -607,6 +632,89 @@ export function Orders() {
           Permanently delete <span className="font-mono font-semibold">{deleteId}</span> from
           MongoDB?
         </p>
+      </Modal>
+
+      <Modal
+        open={!!viewOrder}
+        title={viewOrder ? String(viewOrder.orderId) : 'Order'}
+        badge="View"
+        size="lg"
+        onClose={() => setViewOrder(null)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setViewOrder(null)}>
+              Close
+            </Button>
+            {viewOrder ? (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  openEdit(viewOrder)
+                  setViewOrder(null)
+                }}
+              >
+                Edit
+              </Button>
+            ) : null}
+          </>
+        }
+      >
+        {viewOrder ? (
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto text-sm">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                ['Channel', viewOrder.channel],
+                ['Buyer', viewOrder.buyerName],
+                ['SKU', viewOrder.sku],
+                ['Qty', viewOrder.qty],
+                ['Total USD', viewOrder.totalOrderUSD],
+                ['Status', viewOrder.status],
+                ['Scenario', viewOrder.fulfillmentScenario || '—'],
+                ['Queue', viewOrder.queueOwner || 'india_wh'],
+                ['Warehouse', viewOrder.fulfillmentWh],
+                ['Stock', viewOrder.stockAllocation],
+                ['Barcode', viewOrder.barcode || (viewOrder.barcodeGenerated ? 'Yes' : '—')],
+                ['AWB', viewOrder.awb || '—'],
+                ['ETA WH', viewOrder.expectedWarehouseDeliveryDate || '—'],
+                ['Finance tag', viewOrder.financeTagged ? 'Yes (offline P&L)' : 'No'],
+              ].map(([label, val]) => (
+                <div key={String(label)}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-dim)]">
+                    {label}
+                  </p>
+                  <p className="font-semibold text-[var(--text-main)]">{String(val ?? '—')}</p>
+                </div>
+              ))}
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-dim)]">
+                Ship to
+              </p>
+              <p className="text-[var(--text-muted)]">{String(viewOrder.shippingAddress || '—')}</p>
+            </div>
+            {Array.isArray(viewOrder.history) && viewOrder.history.length > 0 ? (
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[var(--text-dim)]">
+                  History
+                </p>
+                <ul className="space-y-1.5">
+                  {(viewOrder.history as { time?: string; action?: string; detail?: string }[])
+                    .slice(0, 12)
+                    .map((h, i) => (
+                      <li
+                        key={`${h.time}-${i}`}
+                        className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs"
+                      >
+                        <span className="font-bold text-[var(--text-main)]">{h.action}</span>
+                        <span className="text-[var(--text-dim)]"> · {h.time}</span>
+                        <p className="mt-0.5 text-[var(--text-muted)]">{h.detail}</p>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Modal>
     </div>
   )
