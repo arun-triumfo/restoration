@@ -5,13 +5,9 @@ import { Button } from '../components/ui/Button'
 
 const ROLE_OPTIONS = [
   { code: 'super_admin', label: 'Super Admin' },
-  { code: 'india_wh', label: 'India Warehouse' },
-  { code: 'usa_wh', label: 'USA 3PL' },
-  { code: 'logistics', label: 'Logistics' },
-  { code: 'finance', label: 'Finance' },
-  { code: 'sales', label: 'Sales' },
-  { code: 'scm', label: 'SCM / Planning' },
-  { code: 'auditor', label: 'Auditor' },
+  { code: 'india_wh', label: 'India Warehouse Manager' },
+  { code: 'usa_wh', label: 'US Warehouse Manager' },
+  { code: 'finance', label: 'Finance Manager' },
 ]
 
 export function UsersAdmin() {
@@ -98,7 +94,7 @@ export function UsersAdmin() {
           <tbody>
             {rows.map((u) => {
               const email = String(u.email || '')
-              const current = String(u.roleCode || 'auditor')
+              const current = String(u.roleCode || 'india_wh')
               return (
                 <UserRow
                   key={email}

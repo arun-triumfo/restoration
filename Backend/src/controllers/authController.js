@@ -33,8 +33,8 @@ async function tenantPublic(tenantId) {
 
 async function publicUser(doc) {
   if (!doc) return null
-  const roleCode = doc.roleCode || normalizeRoleCode(doc.role)
-  const roleMeta = ROLES[roleCode] || ROLES.auditor
+  const roleCode = normalizeRoleCode(doc.roleCode || doc.role)
+  const roleMeta = ROLES[roleCode] || ROLES.india_wh
   const tenantId = doc.tenantId || DEFAULT_TENANT_ID
   const tenant = await tenantPublic(tenantId)
   return {

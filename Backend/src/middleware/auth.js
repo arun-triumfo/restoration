@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import { roleCanAccessResource } from '../constants/roles.js'
+import { normalizeRoleCode, roleCanAccessResource } from '../constants/roles.js'
 import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'rugos-dev-secret-change-me'
@@ -32,7 +32,7 @@ export function authenticate(req, res, next) {
     req.user = {
       email: decoded.email,
       name: decoded.name,
-      roleCode: decoded.roleCode,
+      roleCode: normalizeRoleCode(decoded.roleCode),
       tenantId: decoded.tenantId || DEFAULT_TENANT_ID,
     }
     return next()

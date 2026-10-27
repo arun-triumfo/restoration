@@ -32,6 +32,15 @@ const orderSchema = new mongoose.Schema(
     fulfillmentWh: String,
     stockAllocation: String,
     allocationTimestamp: String,
+    /** US_STOCK | INDIA_SHIP | MAKE */
+    fulfillmentScenario: String,
+    /** india_wh | usa_wh — who owns the live queue */
+    queueOwner: { type: String, default: 'india_wh' },
+    barcode: String,
+    barcodeGenerated: { type: Boolean, default: false },
+    expectedWarehouseDeliveryDate: String,
+    /** Offline / direct / third-party → Finance P&L */
+    financeTagged: { type: Boolean, default: false },
     courier: String,
     awb: String,
     labelGenerated: { type: Boolean, default: false },

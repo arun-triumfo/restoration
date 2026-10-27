@@ -1,6 +1,11 @@
 import { RESOURCES } from '../resources.js'
 import { getResourceModel } from '../models/createResourceModel.js'
 import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
+import {
+  isOfflineChannel,
+  pushHistory,
+  routeNewOrderPayload,
+} from '../services/orderFulfillment.js'
 
 function modelFor(resource) {
   const meta = RESOURCES[resource]
@@ -90,7 +95,7 @@ export function createResource(resource) {
     try {
       const idField = RESOURCES[resource].idField
       const Model = modelFor(resource)
-      const payload = withTenant(req, req.body || {})
+      let payload = withTenant(req, req.body || {})
       delete payload.passwordHash
       const key = payload[idField]
       if (key === undefined || key === null || key === '') {
@@ -102,6 +107,49 @@ export function createResource(resource) {
       if (exists) {
         return res.status(409).json({ success: false, message: 'Record already exists' })
       }
+
+      // Client SOP: every order → India WH queue + US/India stock scenario
+      if (resource === 'orders') {
+        payload = await routeNewOrderPayload(payload, tenantIdOf(req))
+      }
+
+      // Returns always land with US Warehouse Manager
+      if (resource === 'returns') {
+        payload = {
+          ...payload,
+          queueOwner: 'usa_wh',
+          status: payload.status || 'Pending Inspection',
+          history: pushHistory(payload, 'Return opened', 'Routed to US Warehouse Manager for condition / restock'),
+        }
+      }
+
+      // Offline / direct channel already tagged in routeNewOrderPayload; reinforce finance flag
+      if (resource === 'orders' && (payload.financeTagged || isOfflineChannel(payload.channel))) {
+        payload.financeTagged = true
+      }
+
+      // Finance: courier bill vs recorded weight / rate → Logistics Error
+      if (resource === 'courier_audit') {
+        const billed = Number(payload.billedWeightKg ?? payload.billedWeight ?? 0)
+        const actual = Number(payload.actualWeightKg ?? payload.actualWeight ?? payload.recordedWeightKg ?? 0)
+        const billedAmt = Number(payload.billedAmount ?? payload.amountBilled ?? 0)
+        const agreed = Number(payload.agreedAmount ?? payload.amountAgreed ?? payload.expectedAmount ?? 0)
+        const weightMismatch = billed > 0 && actual > 0 && Math.abs(billed - actual) > 0.15
+        const priceMismatch = billedAmt > 0 && agreed > 0 && Math.abs(billedAmt - agreed) > 0.5
+        if (weightMismatch || priceMismatch || payload.logisticsError) {
+          payload.logisticsError = true
+          payload.status = payload.status || 'Logistics Error'
+          payload.flagReason =
+            payload.flagReason ||
+            [
+              weightMismatch ? `Weight mismatch billed ${billed} vs recorded ${actual}` : null,
+              priceMismatch ? `Price mismatch billed ${billedAmt} vs agreed ${agreed}` : null,
+            ]
+              .filter(Boolean)
+              .join('; ')
+        }
+      }
+
       const created = await Model.create(payload)
       const obj = created.toObject ? created.toObject() : created
       delete obj.passwordHash

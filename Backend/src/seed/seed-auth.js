@@ -1,8 +1,8 @@
 /**
- * P0/P1 seed: default tenant + demo users with password hashes.
- * Does NOT wipe other collections. Safe to re-run.
+ * Seed: Restoration tenant + @restoration.com demo users (4 roles).
+ * Safe to re-run. Old rugos.in / ctasinfo emails are deactivated.
  *
- * Demo password for all users: RugOS@2026
+ * Demo password: RugOS@2026
  */
 import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'
@@ -18,53 +18,41 @@ const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'RugOS@2026'
 
 const DEMO_USERS = [
   {
-    email: 'admin@ctasinfo.com',
-    name: 'Ctas Admin',
-    role: 'Super Admin / Management',
+    email: 'admin@restoration.com',
+    name: 'Restoration Admin',
+    role: 'Super Admin',
     roleCode: 'super_admin',
   },
   {
-    email: 'vikram@rugos.in',
-    name: 'Vikram Singh',
+    email: 'india@restoration.com',
+    name: 'India Warehouse Manager',
     role: 'India Warehouse Manager',
     roleCode: 'india_wh',
   },
   {
-    email: 'j.gallagher@3pl-edison.com',
-    name: 'John Gallagher',
-    role: 'USA 3PL Warehouse Lead',
+    email: 'usa@restoration.com',
+    name: 'US Warehouse Manager',
+    role: 'US Warehouse Manager',
     roleCode: 'usa_wh',
   },
   {
-    email: 'deepak.logistics@rugos.in',
-    name: 'Deepak Sharma',
-    role: 'Logistics & Export Lead',
-    roleCode: 'logistics',
-  },
-  {
-    email: 'finance@rugos.in',
-    name: 'Sunita Agarwal',
-    role: 'Accounts & Finance Lead',
+    email: 'finance@restoration.com',
+    name: 'Finance Manager',
+    role: 'Finance Manager',
     roleCode: 'finance',
   },
-  {
-    email: 'sales@rugos.in',
-    name: 'Priya Mehta',
-    role: 'Sales / Marketplace',
-    roleCode: 'sales',
-  },
-  {
-    email: 'scm@rugos.in',
-    name: 'Amit Planner',
-    role: 'Planning / SCM',
-    roleCode: 'scm',
-  },
-  {
-    email: 'auditor@rugos.in',
-    name: 'Neha Auditor',
-    role: 'Statutory Auditor',
-    roleCode: 'auditor',
-  },
+]
+
+/** Legacy emails — keep row but mark inactive so Login only shows @restoration.com */
+const LEGACY_DEACTIVATE = [
+  'admin@ctasinfo.com',
+  'vikram@rugos.in',
+  'j.gallagher@3pl-edison.com',
+  'finance@rugos.in',
+  'deepak.logistics@rugos.in',
+  'sales@rugos.in',
+  'scm@rugos.in',
+  'auditor@rugos.in',
 ]
 
 async function stampTenantIdOnAll() {
@@ -123,14 +111,23 @@ async function main() {
     console.log('User upserted:', u.email, '→', u.roleCode)
   }
 
-  // Isolation demo admin for Tenant B
+  for (const email of LEGACY_DEACTIVATE) {
+    const r = await User.updateMany(
+      { email },
+      { $set: { status: 'Inactive' } },
+    )
+    if (r.modifiedCount || r.matchedCount) {
+      console.log('Deactivated legacy:', email)
+    }
+  }
+
   await User.findOneAndUpdate(
-    { email: 'admin@demo-b.rugos.test' },
+    { email: 'admin-b@restoration.com' },
     {
       $set: {
-        email: 'admin@demo-b.rugos.test',
+        email: 'admin-b@restoration.com',
         name: 'Tenant B Admin',
-        role: 'Super Admin / Management',
+        role: 'Super Admin',
         roleCode: 'super_admin',
         status: 'Active',
         tenantId: DEMO_TENANT_B.id,
@@ -141,9 +138,14 @@ async function main() {
     },
     { upsert: true, new: true },
   )
-  console.log('User upserted: admin@demo-b.rugos.test → super_admin (Tenant B)')
+  console.log('User upserted: admin-b@restoration.com → super_admin (Tenant B)')
 
-  // Seed one SKU only visible to Tenant B
+  // Deactivate old tenant-b email if present
+  await User.updateMany(
+    { email: 'admin@demo-b.rugos.test' },
+    { $set: { status: 'Inactive' } },
+  )
+
   const Sku = getResourceModel('skus', 'sku', true)
   await Sku.findOneAndUpdate(
     { sku: 'TENANT-B-ONLY', tenantId: DEMO_TENANT_B.id },
@@ -161,9 +163,9 @@ async function main() {
 
   const stamped = await stampTenantIdOnAll()
   console.log(`Stamped tenantId on ${stamped} legacy documents`)
-  console.log(`\nDemo password for all users: ${DEMO_PASSWORD}`)
-  console.log('Try: admin@ctasinfo.com /', DEMO_PASSWORD)
-  console.log('Tenant B: admin@demo-b.rugos.test /', DEMO_PASSWORD)
+  console.log(`\nDemo password: ${DEMO_PASSWORD}`)
+  console.log('Logins:')
+  for (const u of DEMO_USERS) console.log(`  ${u.email} → ${u.roleCode}`)
   process.exit(0)
 }
 

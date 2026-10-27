@@ -1,11 +1,24 @@
-import { Eye, Lock, Pencil, Plus, RotateCcw, Search, Trash2, Zap } from 'lucide-react'
+import {
+  Eye,
+  Lock,
+  Package,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  Truck,
+  Zap,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
-import type { ResourceRow } from '../api/client'
+import { api, ApiError, type ResourceRow } from '../api/client'
+import { normalizeRoleCode } from '../auth/roles'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Pagination } from '../components/ui/Pagination'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 
 type OrderTab = 'all' | 'pending' | 'packed' | 'transit' | 'delivered'
@@ -17,6 +30,8 @@ const channelTone: Record<string, 'orange' | 'warning' | 'cyan' | 'purple' | 'pr
   'B2B Wholesale': 'purple',
   'Wayfair US': 'primary',
   'Shopify DTC': 'slate',
+  'Direct Offline': 'purple',
+  'Third-Party Offline': 'purple',
 }
 
 const FORM_FIELDS = [
@@ -34,11 +49,22 @@ const FORM_FIELDS = [
   'awb',
 ] as const
 
+function inIndiaQueue(order: ResourceRow) {
+  const owner = String(order.queueOwner || 'india_wh')
+  return owner === 'india_wh'
+}
+
+function inUsQueue(order: ResourceRow) {
+  return String(order.queueOwner || '') === 'usa_wh'
+}
+
 export function Orders() {
   const { pushToast } = useApp()
-  const { list, create, update, remove, loading, error } = useData()
+  const { user } = useAuth()
+  const { list, create, update, remove, loading, error, refresh } = useData()
   const orders = list('orders')
   const skus = list('skus')
+  const role = normalizeRoleCode(String(user?.roleCode || ''))
 
   const skuTitle = useMemo(() => {
     const map = new Map<string, string>()
@@ -57,9 +83,22 @@ export function Orders() {
   const [form, setForm] = useState<Record<string, string>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [busyAction, setBusyAction] = useState<string | null>(null)
+
+  const roleScoped = useMemo(() => {
+    if (role === 'super_admin' || role === 'finance') return orders
+    if (role === 'usa_wh') return orders.filter(inUsQueue)
+    // India WH: India queue + In Process make orders
+    return orders.filter(
+      (o) =>
+        inIndiaQueue(o) ||
+        String(o.status || '').toLowerCase().includes('in process') ||
+        String(o.fulfillmentScenario || '') === 'MAKE',
+    )
+  }, [orders, role])
 
   const filtered = useMemo(() => {
-    return orders.filter((order) => {
+    return roleScoped.filter((order) => {
       const q = query.trim().toLowerCase()
       const orderId = String(order.orderId || '')
       const buyerName = String(order.buyerName || '')
@@ -80,26 +119,27 @@ export function Orders() {
       const matchesStatus =
         status === 'all' ||
         (status === 'locked' && locked) ||
-        (status === 'packed' && st === 'Packed & Handover') ||
+        (status === 'packed' && st.includes('Packed')) ||
         (status === 'transit' && st === 'In Transit') ||
         (status === 'delivered' && st === 'Delivered') ||
-        (status === 'make' && st === 'To Make (MTO)')
+        (status === 'make' && (st === 'To Make (MTO)' || st === 'In Process'))
 
       const matchesTab =
         tab === 'all' ||
-        (tab === 'pending' && st === 'Pending Allocation') ||
-        (tab === 'packed' && st === 'Packed & Handover') ||
+        (tab === 'pending' &&
+          (st === 'Pending Allocation' || st === 'In Process' || st.includes('Ready'))) ||
+        (tab === 'packed' && st.includes('Packed')) ||
         (tab === 'transit' && st === 'In Transit') ||
         (tab === 'delivered' && st === 'Delivered')
 
       return matchesQuery && matchesChannel && matchesStatus && matchesTab
     })
-  }, [orders, tab, query, channel, status, skuTitle])
+  }, [roleScoped, tab, query, channel, status, skuTitle])
 
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   const tabs: { id: OrderTab; label: string }[] = [
-    { id: 'all', label: `All Orders (${orders.length})` },
+    { id: 'all', label: `All Orders (${roleScoped.length})` },
     { id: 'pending', label: 'Pending Allocation' },
     { id: 'packed', label: 'Packed & Handover' },
     { id: 'transit', label: 'In Transit' },
@@ -126,9 +166,10 @@ export function Orders() {
   const save = async () => {
     try {
       setSaving(true)
+      const ch = form.channel || 'Direct Offline'
       const payload: ResourceRow = {
         orderId: form.orderId,
-        channel: form.channel,
+        channel: ch,
         marketplaceOrderId: form.marketplaceOrderId,
         orderDate: form.orderDate,
         buyerName: form.buyerName,
@@ -145,6 +186,7 @@ export function Orders() {
         const existing = orders.find((o) => o.orderId === editingId)
         await update('orders', editingId, { ...existing, ...payload })
       } else {
+        // Backend applies India-first routing + finance tag for offline channels
         await create('orders', {
           ...payload,
           stockAllocation: 'Pending',
@@ -172,6 +214,31 @@ export function Orders() {
     }
   }
 
+  const runAction = async (key: string, fn: () => Promise<{ message?: string }>) => {
+    try {
+      setBusyAction(key)
+      const res = await fn()
+      await refresh('orders')
+      pushToast(res.message || 'Done', 'success')
+    } catch (err) {
+      pushToast(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Action failed', 'danger')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const bulkAllocate = () =>
+    runAction('bulk', () => api.fulfillment.reRoute())
+
+  const queueHint =
+    role === 'usa_wh'
+      ? 'US Warehouse Manager queue — pack & dispatch to customer'
+      : role === 'india_wh'
+        ? 'India Warehouse Manager queue — barcode, India→US ship, or make'
+        : role === 'finance'
+          ? 'Finance view — offline / tagged orders feed P&L and courier audit'
+          : 'Live MongoDB orders — India-first routing (US stock → India → make)'
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -179,17 +246,20 @@ export function Orders() {
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-main)] sm:text-2xl">
             Order Pipeline
           </h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Live MongoDB orders — create, update, and delete persist to rugos_erp
-          </p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{queueHint}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm">
-            <Zap className="h-3.5 w-3.5 text-orange-500" /> Bulk Allocate
-          </Button>
-          <Button variant="primary" size="sm" onClick={openCreate}>
-            <Plus className="h-3.5 w-3.5" /> New Order
-          </Button>
+          {(role === 'india_wh' || role === 'super_admin') && (
+            <Button variant="secondary" size="sm" onClick={bulkAllocate} disabled={!!busyAction}>
+              <Zap className="h-3.5 w-3.5 text-orange-500" />
+              {busyAction === 'bulk' ? 'Allocating…' : 'Bulk Allocate'}
+            </Button>
+          )}
+          {(role === 'india_wh' || role === 'super_admin' || role === 'finance') && (
+            <Button variant="primary" size="sm" onClick={openCreate}>
+              <Plus className="h-3.5 w-3.5" /> New Order
+            </Button>
+          )}
         </div>
       </div>
 
@@ -247,7 +317,9 @@ export function Orders() {
             <option value="amazon">Amazon US</option>
             <option value="etsy">Etsy Direct</option>
             <option value="walmart">Walmart US</option>
+            <option value="shopify">Shopify DTC</option>
             <option value="b2b">B2B Wholesale</option>
+            <option value="offline">Direct / Offline</option>
           </select>
           <select
             value={status}
@@ -263,7 +335,7 @@ export function Orders() {
             <option value="packed">Packed & Handover</option>
             <option value="transit">In Transit</option>
             <option value="delivered">Delivered</option>
-            <option value="make">To Make (MTO)</option>
+            <option value="make">In Process / MTO</option>
           </select>
           <span className="text-xs font-medium text-[var(--text-muted)] lg:ml-auto">
             {loading ? 'Loading…' : `${filtered.length} Orders matching`}
@@ -288,19 +360,24 @@ export function Orders() {
                 const title = skuTitle.get(sku) || ''
                 const st = String(order.status || '')
                 const wh = String(order.fulfillmentWh || '')
-                const region = wh.toLowerCase().includes('usa') ? 'USA' : 'India'
+                const scenario = String(order.fulfillmentScenario || '')
+                const region = wh.toLowerCase().includes('usa') || inUsQueue(order) ? 'USA' : 'India'
                 const locked = String(order.stockAllocation || '').toLowerCase().includes('lock')
+                const oid = String(order.orderId)
+                const canIndiaAct = role === 'india_wh' || role === 'super_admin'
+                const canUsAct = role === 'usa_wh' || role === 'super_admin'
                 return (
                   <tr
-                    key={String(order.orderId)}
+                    key={oid}
                     className="border-t border-[var(--border-main)] align-top"
                   >
                     <td className="px-4 py-3">
-                      <p className="font-bold text-[var(--text-main)]">{String(order.orderId)}</p>
+                      <p className="font-bold text-[var(--text-main)]">{oid}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <Badge tone={channelTone[String(order.channel)] ?? 'slate'}>
                           {String(order.channel)}
                         </Badge>
+                        {order.financeTagged ? <Badge tone="warning">Finance</Badge> : null}
                       </div>
                       <p className="mt-1 font-mono text-[11px] text-[var(--text-dim)]">
                         {String(order.marketplaceOrderId || '')}
@@ -327,6 +404,11 @@ export function Orders() {
                       </div>
                       <p className="mt-1 text-xs text-[var(--text-muted)]">{title}</p>
                       <Badge className="mt-1.5">{st}</Badge>
+                      {order.expectedWarehouseDeliveryDate ? (
+                        <p className="mt-1 text-[11px] text-[var(--text-dim)]">
+                          ETA WH: {String(order.expectedWarehouseDeliveryDate)}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-base font-extrabold text-[var(--text-main)]">
@@ -336,29 +418,90 @@ export function Orders() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge tone={region === 'USA' ? 'success' : 'purple'}>{region}</Badge>
+                      {scenario ? (
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">
+                          {scenario.replace('_', ' ')}
+                        </p>
+                      ) : null}
                       <p className="mt-1.5 max-w-[180px] text-xs text-[var(--text-muted)]">{wh}</p>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        <Button variant="ghost" size="sm" aria-label={`View ${String(order.orderId)}`}>
+                        {canIndiaAct && scenario === 'US_STOCK' && !order.barcodeGenerated ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Generate barcode → US bucket"
+                            disabled={!!busyAction}
+                            onClick={() =>
+                              runAction(`bc-${oid}`, () => api.fulfillment.generateBarcode(oid))
+                            }
+                          >
+                            <Zap className="h-3.5 w-3.5 text-orange-500" />
+                          </Button>
+                        ) : null}
+                        {canIndiaAct &&
+                        (scenario === 'INDIA_SHIP' ||
+                          (scenario === 'MAKE' && st !== 'In Process')) ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Ship India → US"
+                            disabled={!!busyAction}
+                            onClick={() =>
+                              runAction(`ship-${oid}`, () => api.fulfillment.shipIndiaToUs(oid))
+                            }
+                          >
+                            <Truck className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                        {canIndiaAct && st === 'In Process' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Production complete"
+                            disabled={!!busyAction}
+                            onClick={() =>
+                              runAction(`prod-${oid}`, () =>
+                                api.fulfillment.productionComplete(oid),
+                              )
+                            }
+                          >
+                            <Package className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                        {canUsAct && st === 'In Transit' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Confirm US receive"
+                            disabled={!!busyAction}
+                            onClick={() =>
+                              runAction(`recv-${oid}`, () => api.fulfillment.usReceive(oid))
+                            }
+                          >
+                            <Package className="h-3.5 w-3.5 text-emerald-600" />
+                          </Button>
+                        ) : null}
+                        <Button variant="ghost" size="sm" aria-label={`View ${oid}`}>
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          aria-label={`Edit ${String(order.orderId)}`}
+                          aria-label={`Edit ${oid}`}
                           onClick={() => openEdit(order)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" aria-label={`Return ${String(order.orderId)}`}>
+                        <Button variant="ghost" size="sm" aria-label={`Return ${oid}`}>
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          aria-label={`Delete ${String(order.orderId)}`}
-                          onClick={() => setDeleteId(String(order.orderId))}
+                          aria-label={`Delete ${oid}`}
+                          onClick={() => setDeleteId(oid)}
                         >
                           <Trash2 className="h-3.5 w-3.5 text-red-500" />
                         </Button>
@@ -409,15 +552,38 @@ export function Orders() {
               }`}
             >
               {key}
-              <input
-                className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
-                value={form[key] ?? ''}
-                disabled={!!editingId && key === 'orderId'}
-                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-              />
+              {key === 'channel' ? (
+                <select
+                  className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+                  value={form[key] ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                >
+                  <option value="">Select channel</option>
+                  <option value="Amazon US">Amazon US</option>
+                  <option value="Shopify DTC">Shopify DTC</option>
+                  <option value="B2B Wholesale">B2B Wholesale</option>
+                  <option value="Direct Offline">Direct Offline</option>
+                  <option value="Third-Party Offline">Third-Party Offline</option>
+                  <option value="Etsy Direct">Etsy Direct</option>
+                  <option value="Walmart US">Walmart US</option>
+                </select>
+              ) : (
+                <input
+                  className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+                  value={form[key] ?? ''}
+                  disabled={!!editingId && key === 'orderId'}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                />
+              )}
             </label>
           ))}
         </div>
+        {!editingId ? (
+          <p className="mt-3 text-xs text-[var(--text-muted)]">
+            New orders route to the India Warehouse Manager queue. Offline / direct channels are
+            tagged for Finance P&amp;L automatically.
+          </p>
+        ) : null}
       </Modal>
 
       <Modal

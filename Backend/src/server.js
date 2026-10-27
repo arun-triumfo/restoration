@@ -27,6 +27,13 @@ import packingRoutes from './routes/packing.js'
 import platformRoutes from './routes/platform.js'
 import resourceRoutes from './routes/resources.js'
 import shippingRoutes from './routes/shipping.js'
+import {
+  bulkReRoute,
+  generateBarcode,
+  productionComplete,
+  shipIndiaToUs,
+  usReceive,
+} from './controllers/fulfillmentController.js'
 import { RESOURCES } from './resources.js'
 
 dotenv.config()
@@ -115,6 +122,43 @@ app.post(
   requireActiveBilling,
   requirePermission('purchase_orders', 'write'),
   fromBuySheet,
+)
+
+// Restoration fulfillment actions (must mount before generic /api/orders CRUD)
+app.post(
+  '/api/orders/actions/re-route',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  bulkReRoute,
+)
+app.post(
+  '/api/orders/actions/generate-barcode',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  generateBarcode,
+)
+app.post(
+  '/api/orders/actions/ship-india-to-us',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  shipIndiaToUs,
+)
+app.post(
+  '/api/orders/actions/us-receive',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  usReceive,
+)
+app.post(
+  '/api/orders/actions/production-complete',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  productionComplete,
 )
 
 app.use('/api/resources', authenticate, requireActiveBilling, resourceRoutes)

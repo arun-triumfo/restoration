@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { normalizeRoleCode } from '../auth/roles'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 
@@ -19,7 +20,7 @@ type Card = { label: string; value: string; hint: string; to: string; icon: type
 export function DepartmentHome() {
   const { user } = useAuth()
   const { list, loading } = useData()
-  const role = user?.roleCode || 'auditor'
+  const role = normalizeRoleCode(String(user?.roleCode || 'india_wh'))
 
   const cards = useMemo((): Card[] => {
     const orders = list('orders')
@@ -28,11 +29,11 @@ export function DepartmentHome() {
     const pos = list('purchase_orders')
     const transfers = list('replenishment')
 
-    const pendingOrders = orders.filter((o) =>
-      String(o.status || '')
-        .toLowerCase()
-        .includes('pending'),
+    const indiaQueue = orders.filter(
+      (o) => String(o.queueOwner || 'india_wh') === 'india_wh',
     ).length
+    const usQueue = orders.filter((o) => String(o.queueOwner || '') === 'usa_wh').length
+    const financeTagged = orders.filter((o) => o.financeTagged).length
 
     const base: Record<string, Card[]> = {
       super_admin: [
@@ -46,7 +47,7 @@ export function DepartmentHome() {
         {
           label: 'Orders in pipeline',
           value: String(orders.length),
-          hint: `${pendingOrders} pending allocation`,
+          hint: `${indiaQueue} India queue · ${usQueue} US bucket`,
           to: '/orders',
           icon: ShoppingBag,
         },
@@ -67,9 +68,16 @@ export function DepartmentHome() {
       ],
       india_wh: [
         {
+          label: 'India order queue',
+          value: String(indiaQueue),
+          hint: 'Barcode · ship to US · make',
+          to: '/orders',
+          icon: ShoppingBag,
+        },
+        {
           label: 'MTO / PO work',
           value: String(pos.length),
-          hint: 'Weaving & packing queue',
+          hint: 'In Process / weaving',
           to: '/mto',
           icon: Factory,
         },
@@ -87,28 +95,21 @@ export function DepartmentHome() {
           to: '/inventory',
           icon: Boxes,
         },
-        {
-          label: 'Alerts',
-          value: String(alerts.length),
-          hint: 'Stock & SLA',
-          to: '/alerts',
-          icon: Bell,
-        },
       ],
       usa_wh: [
+        {
+          label: 'US order bucket',
+          value: String(usQueue),
+          hint: 'Pack & dispatch to customer',
+          to: '/orders',
+          icon: ShoppingBag,
+        },
         {
           label: 'Receive transfers',
           value: String(transfers.length),
           hint: 'Confirm inbound GRN',
           to: '/stock-transfers',
           icon: Truck,
-        },
-        {
-          label: 'Orders to pick',
-          value: String(pendingOrders || orders.length),
-          hint: 'Marketplace fulfillment',
-          to: '/orders',
-          icon: ShoppingBag,
         },
         {
           label: 'USA inventory',
@@ -127,157 +128,37 @@ export function DepartmentHome() {
       ],
       finance: [
         {
-          label: 'Receivables',
-          value: 'Aging',
-          hint: 'FEMA / e-BRC clock',
-          to: '/receivables',
-          icon: Wallet,
+          label: 'Offline / tagged',
+          value: String(financeTagged),
+          hint: 'Direct orders in P&L',
+          to: '/orders',
+          icon: ShoppingBag,
         },
         {
           label: 'Profitability',
           value: 'True cost',
-          hint: 'After courier actuals',
+          hint: 'Mfg + ship + US vs sell',
           to: '/profitability',
           icon: TrendingUp,
         },
         {
-          label: 'Courier audit',
-          value: 'Disputes',
+          label: 'Logistics errors',
+          value: 'Courier audit',
           hint: 'Weight / rate variance',
           to: '/courier-audit',
           icon: Bell,
         },
         {
-          label: 'Reports',
-          value: 'Hub',
-          hint: 'Compliance exports',
-          to: '/reports',
-          icon: Boxes,
-        },
-      ],
-      logistics: [
-        {
-          label: 'Shipping',
-          value: 'Dispatch',
-          hint: 'Loading plans & AWB',
-          to: '/shipping',
-          icon: Truck,
-        },
-        {
-          label: 'Courier audit',
-          value: 'Variance',
-          hint: 'Overcharge watch',
-          to: '/courier-audit',
-          icon: Bell,
-        },
-        {
           label: 'Export docs',
-          value: 'Suite',
-          hint: 'Invoice & packing list',
+          value: 'Repository',
+          hint: 'Invoice · customs · bills',
           to: '/export-docs',
-          icon: Package,
-        },
-        {
-          label: 'Transfers',
-          value: String(transfers.length),
-          hint: 'In-transit freight',
-          to: '/stock-transfers',
           icon: Boxes,
-        },
-      ],
-      sales: [
-        {
-          label: 'Orders',
-          value: String(orders.length),
-          hint: `${pendingOrders} need allocation`,
-          to: '/orders',
-          icon: ShoppingBag,
-        },
-        {
-          label: 'Buyers',
-          value: 'B2B',
-          hint: 'Wholesale accounts',
-          to: '/buyers',
-          icon: Boxes,
-        },
-        {
-          label: 'Returns',
-          value: 'RMA',
-          hint: 'Claims & refunds',
-          to: '/returns',
-          icon: Package,
-        },
-        {
-          label: 'Alerts',
-          value: String(alerts.length),
-          hint: 'SLA breaches',
-          to: '/alerts',
-          icon: Bell,
-        },
-      ],
-      scm: [
-        {
-          label: 'Forecast',
-          value: 'Buy sheet',
-          hint: 'What to order today',
-          to: '/forecast',
-          icon: TrendingUp,
-        },
-        {
-          label: 'Alerts',
-          value: String(alerts.length),
-          hint: 'Low stock sentinels',
-          to: '/alerts',
-          icon: Bell,
-        },
-        {
-          label: 'Purchase orders',
-          value: String(pos.length),
-          hint: 'Open replenishment',
-          to: '/purchase-orders',
-          icon: Factory,
-        },
-        {
-          label: 'Inventory',
-          value: String(skus.length),
-          hint: 'Cover & velocity',
-          to: '/inventory',
-          icon: Package,
-        },
-      ],
-      auditor: [
-        {
-          label: 'System logs',
-          value: 'Audit',
-          hint: 'Who changed what',
-          to: '/system-logs',
-          icon: Bell,
-        },
-        {
-          label: 'Reports',
-          value: 'Read-only',
-          hint: 'Compliance packs',
-          to: '/reports',
-          icon: Boxes,
-        },
-        {
-          label: 'Courier audit',
-          value: 'Review',
-          hint: 'Dispute trail',
-          to: '/courier-audit',
-          icon: Truck,
-        },
-        {
-          label: 'Receivables',
-          value: 'Aging',
-          hint: 'Export realization',
-          to: '/receivables',
-          icon: Wallet,
         },
       ],
     }
 
-    return base[role] || base.auditor
+    return base[role] || base.india_wh
   }, [list, role])
 
   return (

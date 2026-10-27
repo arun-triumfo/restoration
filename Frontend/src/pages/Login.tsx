@@ -8,7 +8,7 @@ import { ApiError } from '../api/client'
 export function Login() {
   const { user, loading, login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('admin@ctasinfo.com')
+  const [email, setEmail] = useState('admin@restoration.com')
   const [password, setPassword] = useState(DEMO_PASSWORD)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

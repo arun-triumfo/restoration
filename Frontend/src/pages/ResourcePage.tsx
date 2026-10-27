@@ -76,7 +76,7 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
   const canWrite =
     user?.roleCode === 'super_admin' ||
     Boolean(user?.permissions?.actions?.includes('write')) ||
-    (user?.roleCode !== 'auditor' && user?.roleCode !== undefined)
+    user?.roleCode !== undefined
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)

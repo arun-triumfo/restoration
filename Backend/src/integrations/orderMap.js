@@ -1,9 +1,10 @@
+import { decideFulfillment } from '../services/orderFulfillment.js'
+
 export function mapOrder({ orderId, channel, buyerName, sku, qty, total, imageUrl, title, extra = {} }) {
-  return {
+  const draft = {
     orderId,
     channel,
     buyerName: buyerName || 'Customer',
-    status: 'Pending Allocation',
     sku: sku || 'UNMAPPED',
     title,
     imageUrl,
@@ -15,6 +16,28 @@ export function mapOrder({ orderId, channel, buyerName, sku, qty, total, imageUr
     tenantId: extra.tenantId,
     orderDate: extra.orderDate || new Date().toISOString().slice(0, 10),
     mappingException: !sku || sku === 'UNMAPPED',
+  }
+
+  // Sync path: decide from catalog sku row if provided in extra.skuDoc
+  const decision = decideFulfillment(draft, extra.skuDoc || null)
+  return {
+    ...draft,
+    status: decision.status,
+    fulfillmentWh: decision.fulfillmentWh,
+    stockAllocation: decision.stockAllocation,
+    fulfillmentScenario: decision.fulfillmentScenario,
+    queueOwner: decision.queueOwner,
+    barcodeGenerated: false,
+    mtoNeeded: decision.mtoNeeded,
+    expectedWarehouseDeliveryDate: decision.expectedWarehouseDeliveryDate,
+    financeTagged: decision.financeTagged,
+    history: [
+      {
+        time: new Date().toISOString(),
+        action: 'Channel sync → India WH',
+        detail: decision.routingNote,
+      },
+    ],
   }
 }
 

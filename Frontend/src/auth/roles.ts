@@ -1,36 +1,40 @@
-/** Mirror of Backend role menus — used to filter sidebar before /me returns */
+/** Mirror of Backend role menus — Restoration client: 4 roles only */
 
 import { planAllowsPath } from './plans'
 
-export type RoleCode =
-  | 'super_admin'
-  | 'scm'
-  | 'sales'
-  | 'india_wh'
-  | 'usa_wh'
-  | 'logistics'
-  | 'finance'
-  | 'auditor'
+export type RoleCode = 'super_admin' | 'india_wh' | 'usa_wh' | 'finance'
+
+const LEGACY: Record<string, RoleCode> = {
+  scm: 'india_wh',
+  sales: 'india_wh',
+  logistics: 'india_wh',
+  auditor: 'finance',
+}
+
+export function normalizeRoleCode(roleOrCode: string | undefined): RoleCode {
+  const raw = String(roleOrCode || '')
+    .trim()
+    .toLowerCase()
+  if (raw === 'super_admin' || raw === 'india_wh' || raw === 'usa_wh' || raw === 'finance') {
+    return raw
+  }
+  if (LEGACY[raw]) return LEGACY[raw]
+  if (raw.includes('super') || raw.includes('admin')) return 'super_admin'
+  if (raw.includes('finance') || raw.includes('audit') || raw.includes('account')) return 'finance'
+  if (raw.includes('usa') || raw.includes('3pl') || raw.includes('edison')) return 'usa_wh'
+  return 'india_wh'
+}
 
 export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
   super_admin: ['*'],
-  scm: [
-    '/',
-    '/workflow',
-    '/forecast',
-    '/buy-sheet',
-    '/alerts',
-    '/warehouse-analytics',
-    '/inventory',
-    '/purchase-orders',
-    '/raw-materials',
-    '/billing',
-  ],
-  sales: ['/', '/workflow', '/orders', '/buyers', '/returns', '/alerts', '/billing'],
   india_wh: [
     '/',
     '/workflow',
+    '/orders',
+    '/buyers',
     '/inventory',
+    '/forecast',
+    '/buy-sheet',
     '/mto',
     '/purchase-orders',
     '/stock-transfers',
@@ -41,6 +45,7 @@ export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
     '/export-docs',
     '/raw-materials',
     '/stock-history',
+    '/warehouse-analytics',
     '/alerts',
     '/billing',
   ],
@@ -58,39 +63,18 @@ export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
     '/alerts',
     '/billing',
   ],
-  logistics: [
-    '/',
-    '/workflow',
-    '/shipping',
-    '/packing',
-    '/loading-plans',
-    '/carriers',
-    '/courier-audit',
-    '/stock-transfers',
-    '/export-docs',
-    '/alerts',
-    '/billing',
-  ],
   finance: [
     '/',
     '/workflow',
+    '/orders',
     '/receivables',
     '/profitability',
     '/reports',
     '/currencies',
     '/courier-audit',
+    '/export-docs',
     '/returns',
     '/alerts',
-    '/billing',
-  ],
-  auditor: [
-    '/',
-    '/workflow',
-    '/system-logs',
-    '/reports',
-    '/courier-audit',
-    '/receivables',
-    '/profitability',
     '/billing',
   ],
 }
@@ -101,25 +85,26 @@ export function canAccessPath(
   tenant?: { modules?: string[]; plan?: string },
 ): boolean {
   if (!roleCode) return false
-  const menus = ROLE_MENUS[roleCode as RoleCode]
+  const code = normalizeRoleCode(roleCode)
+  const menus = ROLE_MENUS[code]
   if (!menus) return path === '/workflow' || path === '/login'
   const roleOk =
     (menus as string[]).includes('*') || path === '/workflow' || (menus as string[]).includes(path)
   if (!roleOk) return false
-  // Plan entitlements (P2) — always allow login/workflow/billing
   if (path === '/workflow' || path === '/billing' || path === '/login') return true
   return planAllowsPath(tenant?.modules, tenant?.plan, path)
 }
 
+/** All Restoration demo logins use @restoration.com */
 export const DEMO_ACCOUNTS = [
-  { email: 'admin@ctasinfo.com', role: 'Super Admin', roleCode: 'super_admin' },
-  { email: 'vikram@rugos.in', role: 'India WH', roleCode: 'india_wh' },
-  { email: 'j.gallagher@3pl-edison.com', role: 'USA 3PL', roleCode: 'usa_wh' },
-  { email: 'deepak.logistics@rugos.in', role: 'Logistics', roleCode: 'logistics' },
-  { email: 'finance@rugos.in', role: 'Finance', roleCode: 'finance' },
-  { email: 'sales@rugos.in', role: 'Sales', roleCode: 'sales' },
-  { email: 'scm@rugos.in', role: 'SCM', roleCode: 'scm' },
-  { email: 'auditor@rugos.in', role: 'Auditor', roleCode: 'auditor' },
+  { email: 'admin@restoration.com', role: 'Super Admin', roleCode: 'super_admin' as RoleCode },
+  {
+    email: 'india@restoration.com',
+    role: 'India Warehouse Manager',
+    roleCode: 'india_wh' as RoleCode,
+  },
+  { email: 'usa@restoration.com', role: 'US Warehouse Manager', roleCode: 'usa_wh' as RoleCode },
+  { email: 'finance@restoration.com', role: 'Finance Manager', roleCode: 'finance' as RoleCode },
 ]
 
 export const DEMO_PASSWORD = 'RugOS@2026'

@@ -255,6 +255,34 @@ export const api = {
       ),
   },
 
+  fulfillment: {
+    reRoute: (orderIds?: string[]) =>
+      request<{ success: boolean; count: number; data: ResourceRow[]; message?: string }>(
+        '/orders/actions/re-route',
+        { method: 'POST', body: JSON.stringify({ orderIds }) },
+      ),
+    generateBarcode: (orderId: string) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/orders/actions/generate-barcode',
+        { method: 'POST', body: JSON.stringify({ orderId }) },
+      ),
+    shipIndiaToUs: (orderId: string) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/orders/actions/ship-india-to-us',
+        { method: 'POST', body: JSON.stringify({ orderId }) },
+      ),
+    usReceive: (orderId: string) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/orders/actions/us-receive',
+        { method: 'POST', body: JSON.stringify({ orderId }) },
+      ),
+    productionComplete: (orderId: string) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/orders/actions/production-complete',
+        { method: 'POST', body: JSON.stringify({ orderId }) },
+      ),
+  },
+
   purchaseOrders: {
     fromBuySheet: (payload: {
       lines: { sku: string; qty: number; title?: string }[]

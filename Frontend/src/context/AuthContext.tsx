@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { api, setAuthToken, type TenantDto } from '../api/client'
-import type { RoleCode } from '../auth/roles'
+import { normalizeRoleCode, type RoleCode } from '../auth/roles'
 
 const TOKEN_KEY = 'rugos-auth-token'
 
@@ -60,7 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(t)
     try {
       const res = await api.me()
-      setUser(res.user)
+      setUser({
+        ...res.user,
+        roleCode: normalizeRoleCode(String(res.user.roleCode || res.user.role)),
+      })
       setToken(t)
     } catch {
       logout()
@@ -78,7 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(TOKEN_KEY, res.token)
     setAuthToken(res.token)
     setToken(res.token)
-    setUser(res.user)
+    setUser({
+      ...res.user,
+      roleCode: normalizeRoleCode(String(res.user.roleCode || res.user.role)),
+    })
   }, [])
 
   const value = useMemo(

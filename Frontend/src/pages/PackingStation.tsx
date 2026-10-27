@@ -4,7 +4,7 @@ import { api, ApiError, type ResourceRow } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/Button'
 
-const WH = new Set(['super_admin', 'india_wh', 'usa_wh', 'logistics'])
+const WH = new Set(['super_admin', 'india_wh', 'usa_wh'])
 
 export function PackingStation() {
   const { user } = useAuth()
@@ -37,7 +37,7 @@ export function PackingStation() {
   if (!WH.has(String(user?.roleCode))) {
     return (
       <div className="rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-6 text-sm text-[var(--text-muted)]">
-        Packing station is for India WH / USA WH / Logistics / Super Admin only.
+        Packing station is for India / US Warehouse Managers and Super Admin only.
       </div>
     )
   }

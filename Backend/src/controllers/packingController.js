@@ -23,13 +23,13 @@ function Packing() {
   return getResourceModel('packing_events', 'id', true)
 }
 
-const WH_ROLES = new Set(['super_admin', 'india_wh', 'usa_wh', 'logistics'])
+const WH_ROLES = new Set(['super_admin', 'india_wh', 'usa_wh'])
 
 export function requireWarehouseRole(req, res, next) {
   if (!WH_ROLES.has(req.user?.roleCode)) {
     return res.status(403).json({
       success: false,
-      message: 'Packing station is limited to warehouse / logistics roles',
+      message: 'Packing station is limited to India / US warehouse roles',
     })
   }
   return next()
@@ -84,16 +84,20 @@ export async function confirmPack(req, res) {
     }
     await Packing().create(event)
 
+    const role = req.user?.roleCode
+    const nextStatus =
+      role === 'usa_wh' || order.queueOwner === 'usa_wh' ? 'Packed & Handover' : 'Packed & Handover'
     const updated = await Orders()
       .findOneAndUpdate(
         { orderId, tenantId: tid },
         {
           $set: {
-            status: 'Packed',
+            status: nextStatus,
             packingPhotoUrl: photoUrl,
             packedAt: event.packedAt,
             packedBy: event.packedBy,
             packingScanSku: scannedSku,
+            stockAllocation: 'Packed',
           },
         },
         { new: true },
@@ -114,14 +118,18 @@ export async function confirmPack(req, res) {
 export async function listPackingQueue(req, res) {
   try {
     const tid = tenantIdOf(req)
-    const data = await Orders()
-      .find({
-        tenantId: tid,
-        status: { $regex: /pending|allocat|pick|open/i },
-      })
-      .sort({ updatedAt: -1 })
-      .limit(40)
-      .lean()
+    const role = req.user?.roleCode
+    const filter = {
+      tenantId: tid,
+      status: { $regex: /pending|allocat|pick|open|ready/i },
+    }
+    // US manager packs customer orders in their bucket; India packs India→US / mill
+    if (role === 'usa_wh') {
+      filter.queueOwner = 'usa_wh'
+    } else if (role === 'india_wh') {
+      filter.$or = [{ queueOwner: 'india_wh' }, { queueOwner: { $exists: false } }]
+    }
+    const data = await Orders().find(filter).sort({ updatedAt: -1 }).limit(40).lean()
     res.json({ success: true, count: data.length, data })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })

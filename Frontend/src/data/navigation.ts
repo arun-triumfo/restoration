@@ -1,6 +1,9 @@
 import type { NavSection } from '../types'
 
-/** Sidebar order matches System Workflow (menuPlaybook.ts) step by step. */
+/**
+ * Sidebar: daily ops flow on top, master/setup screens at the bottom.
+ * Matches Restoration fulfillment path (Orders → Stock → Make → Ship → Finance).
+ */
 export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'START HERE',
@@ -10,33 +13,19 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: '1 · SET UP THE COMPANY',
-    items: [
-      { label: 'Company', path: '/company', icon: 'Building2' },
-      { label: 'Users & RBAC', path: '/users', icon: 'Users' },
-      { label: 'Warehouses', path: '/warehouses', icon: 'Warehouse' },
-      { label: 'Buyers', path: '/buyers', icon: 'Briefcase' },
-      { label: 'Looms', path: '/looms', icon: 'Hammer' },
-      { label: 'Carriers', path: '/carriers', icon: 'Ship' },
-      { label: 'Currencies', path: '/currencies', icon: 'Coins' },
-      { label: 'Integrations', path: '/integrations', icon: 'Zap' },
-    ],
-  },
-  {
-    title: '2 · SELL',
+    title: '1 · ORDERS',
     items: [{ label: 'Orders', path: '/orders', icon: 'ShoppingBag' }],
   },
   {
-    title: '3 · STOCK',
+    title: '2 · STOCK',
     items: [
       { label: 'Inventory', path: '/inventory', icon: 'Package' },
-      { label: 'Raw Materials', path: '/raw-materials', icon: 'Layers' },
       { label: 'Stock History', path: '/stock-history', icon: 'Clock' },
       { label: 'Warehouse Analytics', path: '/warehouse-analytics', icon: 'BarChart3' },
     ],
   },
   {
-    title: '4 · MAKE OR BUY',
+    title: '3 · MAKE OR BUY',
     items: [
       { label: 'Demand Forecast', path: '/forecast', icon: 'TrendingUp' },
       { label: 'Buy Sheet → PO', path: '/buy-sheet', icon: 'FileText' },
@@ -45,7 +34,7 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: '5 · MOVE & SHIP',
+    title: '4 · MOVE & SHIP',
     items: [
       { label: 'Stock Transfers', path: '/stock-transfers', icon: 'ArrowLeftRight' },
       { label: 'Packing Station', path: '/packing', icon: 'Package' },
@@ -55,7 +44,7 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: '6 · AFTER THE SALE',
+    title: '5 · RETURNS & FINANCE',
     items: [
       { label: 'Returns & Claims', path: '/returns', icon: 'RotateCcw' },
       { label: 'Courier Audit', path: '/courier-audit', icon: 'ShieldCheck' },
@@ -65,11 +54,25 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: '7 · WATCH THE SYSTEM',
+    title: '6 · WATCH',
     items: [
       { label: 'Automation & Alerts', path: '/alerts', icon: 'Bell' },
       { label: 'Failed Jobs', path: '/failed-jobs', icon: 'AlertTriangle' },
       { label: 'System Logs', path: '/system-logs', icon: 'Terminal' },
+    ],
+  },
+  {
+    title: '7 · MASTERS',
+    items: [
+      { label: 'Company', path: '/company', icon: 'Building2' },
+      { label: 'Users & RBAC', path: '/users', icon: 'Users' },
+      { label: 'Warehouses', path: '/warehouses', icon: 'Warehouse' },
+      { label: 'Buyers', path: '/buyers', icon: 'Briefcase' },
+      { label: 'Looms', path: '/looms', icon: 'Hammer' },
+      { label: 'Carriers', path: '/carriers', icon: 'Ship' },
+      { label: 'Currencies', path: '/currencies', icon: 'Coins' },
+      { label: 'Raw Materials', path: '/raw-materials', icon: 'Layers' },
+      { label: 'Integrations', path: '/integrations', icon: 'Zap' },
       { label: 'System Config', path: '/settings', icon: 'Settings' },
     ],
   },
