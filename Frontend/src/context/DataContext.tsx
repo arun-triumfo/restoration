@@ -7,9 +7,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { api, type ResourceRow } from '../api/client'
+import { api, ApiError, type ResourceRow } from '../api/client'
 import { ALL_RESOURCE_KEYS, RESOURCE_BY_KEY } from '../data/resources'
 import { useApp } from './AppContext'
+import { useAuth } from './AuthContext'
 
 type Store = Record<string, ResourceRow[]>
 
@@ -47,48 +48,78 @@ async function fetchKeys(keys: string[]) {
   )
   const loaded: Store = {}
   const failures: string[] = []
-  for (const result of results) {
+  const forbidden: string[] = []
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i]
+    const key = keys[i]
     if (result.status === 'fulfilled') {
-      const [key, data] = result.value
-      loaded[key] = data
+      const [k, data] = result.value
+      loaded[k] = data
     } else {
-      failures.push(result.reason?.message || 'request failed')
+      const reason = result.reason
+      // Role cannot read this module — not a real outage
+      if (reason instanceof ApiError && (reason.status === 403 || reason.status === 401)) {
+        forbidden.push(key)
+        loaded[key] = []
+      } else {
+        failures.push(reason?.message || `${key} failed`)
+      }
     }
   }
-  return { loaded, failures }
+  return { loaded, failures, forbidden }
+}
+
+function keysForUser(resources: string[] | undefined): string[] {
+  if (!resources || resources.includes('*')) return ALL_RESOURCE_KEYS
+  const allowed = new Set(resources)
+  return ALL_RESOURCE_KEYS.filter((k) => allowed.has(k))
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { pushToast } = useApp()
+  const { user } = useAuth()
   const [store, setStore] = useState<Store>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const refresh = useCallback(async (resource?: string) => {
-    if (resource) {
-      const { loaded, failures } = await fetchKeys([resource])
-      if (failures.length) throw new Error(failures[0])
-      setStore((prev) => ({ ...prev, ...loaded }))
-      setError(null)
-      return
-    }
+  const allowedKeys = useMemo(
+    () => keysForUser(user?.permissions?.resources),
+    [user?.permissions?.resources],
+  )
 
-    const rest = ALL_RESOURCE_KEYS.filter((k) => !PRIORITY_KEYS.includes(k))
-    const first = await fetchKeys(PRIORITY_KEYS.filter((k) => ALL_RESOURCE_KEYS.includes(k)))
-    setStore((prev) => ({ ...prev, ...first.loaded }))
-    setLoading(false)
+  const refresh = useCallback(
+    async (resource?: string) => {
+      if (resource) {
+        const { loaded, failures } = await fetchKeys([resource])
+        if (failures.length) throw new Error(failures[0])
+        setStore((prev) => ({ ...prev, ...loaded }))
+        setError(null)
+        return
+      }
 
-    const second = await fetchKeys(rest)
-    setStore((prev) => ({ ...prev, ...second.loaded }))
+      const scope = allowedKeys.length ? allowedKeys : ALL_RESOURCE_KEYS
+      const priority = PRIORITY_KEYS.filter((k) => scope.includes(k))
+      const rest = scope.filter((k) => !PRIORITY_KEYS.includes(k))
 
-    const failCount = first.failures.length + second.failures.length
-    if (failCount === ALL_RESOURCE_KEYS.length) {
-      throw new Error(first.failures[0] || second.failures[0] || 'Failed to load data')
-    }
-    setError(failCount ? `${failCount} module(s) failed to load` : null)
-  }, [])
+      const first = await fetchKeys(priority)
+      setStore((prev) => ({ ...prev, ...first.loaded }))
+      setLoading(false)
+
+      const second = await fetchKeys(rest)
+      setStore((prev) => ({ ...prev, ...second.loaded }))
+
+      const failCount = first.failures.length + second.failures.length
+      if (failCount && failCount >= scope.length) {
+        throw new Error(first.failures[0] || second.failures[0] || 'Failed to load data')
+      }
+      // Only surface real network/server failures — not role 403s
+      setError(failCount ? `${failCount} module(s) failed to load` : null)
+    },
+    [allowedKeys],
+  )
 
   useEffect(() => {
+    if (!user) return
     let alive = true
     ;(async () => {
       try {
@@ -105,7 +136,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false
     }
-  }, [refresh])
+  }, [refresh, user?.email, user?.roleCode])
 
   const getId = useCallback((resource: string, row: ResourceRow) => {
     const idField = RESOURCE_BY_KEY[resource]?.idField

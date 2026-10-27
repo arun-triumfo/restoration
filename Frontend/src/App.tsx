@@ -13,7 +13,9 @@ import { BuySheet } from './pages/BuySheet'
 import { DemandForecast } from './pages/DemandForecast'
 import { HomeRoute } from './pages/HomeRoute'
 import { IntegrationsHub } from './pages/IntegrationsHub'
+import { Inventory } from './pages/Inventory'
 import { Login } from './pages/Login'
+import { Orders } from './pages/Orders'
 import { PackingStation } from './pages/PackingStation'
 import { ResourcePage } from './pages/ResourcePage'
 import { ShippingDesk } from './pages/ShippingDesk'
@@ -36,6 +38,8 @@ const NATIVE_PATHS = new Set([
   '/forecast',
   '/alerts',
   '/warehouse-analytics',
+  '/orders',
+  '/inventory',
 ])
 
 /** Prefer live Mongo CRUD tables over wireframe for client add/edit/delete */
@@ -147,6 +151,22 @@ export default function App() {
                 element={
                   <RequirePath>
                     <UsersAdmin />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="orders"
+                element={
+                  <RequirePath>
+                    <Orders />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="inventory"
+                element={
+                  <RequirePath>
+                    <Inventory />
                   </RequirePath>
                 }
               />
