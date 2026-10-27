@@ -46,6 +46,7 @@ export async function fromBuySheet(req, res) {
       createdBy: req.user?.email,
       tenantId: tid,
       orderedAt: new Date().toISOString(),
+      orderDate: new Date().toISOString().slice(0, 10),
     }
 
     await POs().create(doc)

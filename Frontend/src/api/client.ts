@@ -92,15 +92,34 @@ export type AuthUserDto = {
   permissions?: { resources: string[]; actions: string[] }
 }
 
-export type IntegrationConnection = {
+export type IntegrationFieldDef = {
+  key: string
+  label: string
+  secret?: boolean
+  required?: boolean
+  placeholder?: string
+}
+
+export type IntegrationCatalogItem = {
   id: string
+  label: string
+  kind: 'marketplace' | 'courier' | 'billing'
+  hint: string
+  fields: IntegrationFieldDef[]
+}
+
+export type IntegrationConnection = {
+  id: string | null
   channel: string
   status: string
+  mode?: string
   shopDomain?: string | null
   lastSyncAt?: string | null
   lastError?: string | null
+  lastVerifiedAt?: string | null
   hasSecret?: boolean
   secretHint?: string | null
+  fields?: Record<string, { filled: boolean; hint: string | null }>
   meta?: Record<string, unknown>
 }
 
@@ -153,7 +172,11 @@ export const api = {
 
   integrations: {
     list: () =>
-      request<{ success: boolean; data: IntegrationConnection[] }>('/integrations'),
+      request<{
+        success: boolean
+        data: IntegrationConnection[]
+        catalog: IntegrationCatalogItem[]
+      }>('/integrations'),
     connect: (channel: string, payload: Record<string, unknown>) =>
       request<{ success: boolean; connection: IntegrationConnection; message?: string }>(
         `/integrations/${encodeURIComponent(channel)}/connect`,
@@ -179,6 +202,21 @@ export const api = {
         method: 'POST',
         body: '{}',
       }),
+    checkout: (channel: string, payload: Record<string, unknown>) =>
+      request<{
+        success: boolean
+        provider?: string
+        orderId?: string
+        keyId?: string
+        url?: string
+        sessionId?: string
+        free?: boolean
+        plan?: string
+        message?: string
+      }>(`/integrations/${encodeURIComponent(channel)}/checkout`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
   },
 
   shipping: {
@@ -190,6 +228,7 @@ export const api = {
         carrier: string
         carrierLabel: string
         rates: { service: string; name: string; days: number; amount: number; currency: string }[]
+        mode?: string
       }>('/shipping/rates', { method: 'POST', body: JSON.stringify(payload) }),
     buyLabel: (payload: Record<string, unknown>) =>
       request<{ success: boolean; shipment: ResourceRow; message?: string }>('/shipping/labels', {

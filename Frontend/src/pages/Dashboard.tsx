@@ -3,10 +3,7 @@ import {
   Bell,
   Boxes,
   DollarSign,
-  Download,
   Factory,
-  FileSpreadsheet,
-  FileText,
   Package,
   Percent,
   Ship,
@@ -28,7 +25,6 @@ import {
   YAxis,
 } from 'recharts'
 import { Link } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
 import { useData } from '../context/DataContext'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -44,7 +40,6 @@ type Stock = {
 }
 
 export function Dashboard() {
-  const { setAlertsOpen, openModal } = useApp()
   const { list, loading } = useData()
 
   const skus = list('skus')
@@ -91,8 +86,8 @@ export function Dashboard() {
       .slice(-6)
       .map((row) => ({
         month: String(row.periodShort || row.period || ''),
-        dtc: Number(row.orderInflowsUSD || 0) * 0.35,
-        marketplace: Number(row.orderInflowsUSD || 0) * 0.45,
+        dtc: Number(row.orderInflowsUSD || 0),
+        marketplace: 0,
         b2b: Number(row.exportInflowsUSD || 0),
       }))
   }, [monthly])
@@ -111,22 +106,18 @@ export function Dashboard() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-main)] sm:text-2xl">
-            Odette Rugs — Executive Command Center
+            Restoration — live dashboard
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Live metrics from MongoDB · {loading ? 'syncing…' : 'connected to rugos_erp'}
+            Counts below come from Mongo (orders, SKUs, alerts, financials) — {loading ? 'syncing…' : 'live'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={() => openModal('export', 'Briefing')}>
-            <Download className="h-3.5 w-3.5" /> Export Briefing
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openModal('export', 'PDF Dossier')}>
-            <FileText className="h-3.5 w-3.5" /> Executive PDF
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openModal('export', 'Metrics CSV')}>
-            <FileSpreadsheet className="h-3.5 w-3.5" /> Metrics CSV
-          </Button>
+          <Link to="/workflow">
+            <Button variant="secondary" size="sm">
+              How to use
+            </Button>
+          </Link>
           <Link to="/forecast">
             <Button variant="primary" size="sm">
               <TrendingUp className="h-3.5 w-3.5" /> Demand Forecast
@@ -220,9 +211,11 @@ export function Dashboard() {
             </p>
           </div>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setAlertsOpen(true)}>
-          <Bell className="h-3.5 w-3.5" /> Open Alerts Center ({alerts.length})
-        </Button>
+        <Link to="/alerts">
+          <Button variant="primary" size="sm">
+            <Bell className="h-3.5 w-3.5" /> Open Alerts ({alerts.length})
+          </Button>
+        </Link>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -257,16 +250,15 @@ export function Dashboard() {
                     fontSize: 12,
                   }}
                 />
-                <Area type="monotone" dataKey="dtc" stackId="1" stroke="#6366f1" fill="url(#gDtc)" name="DTC" />
                 <Area
                   type="monotone"
-                  dataKey="marketplace"
+                  dataKey="dtc"
                   stackId="1"
-                  stroke="#06b6d4"
-                  fill="#06b6d433"
-                  name="Marketplace"
+                  stroke="#6366f1"
+                  fill="url(#gDtc)"
+                  name="Order inflows"
                 />
-                <Area type="monotone" dataKey="b2b" stackId="1" stroke="#a855f7" fill="#a855f733" name="B2B" />
+                <Area type="monotone" dataKey="b2b" stackId="1" stroke="#a855f7" fill="#a855f733" name="Export inflows" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

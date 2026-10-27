@@ -42,7 +42,7 @@ export function BuySheet() {
       const res = await api.purchaseOrders.fromBuySheet({
         lines,
         vendor,
-        notes: 'Created from RugOS Buy Sheet (P4)',
+        notes: 'Created from RugOS Buy Sheet',
       })
       setCreatedPo(String(res.data.poNumber || ''))
       setMsg(res.message || 'Draft PO created')
@@ -59,12 +59,28 @@ export function BuySheet() {
     <div className="mx-auto max-w-4xl space-y-4">
       <header>
         <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-          P4 · Buy sheet → PO
+          Purchasing · Buy sheet → PO
         </p>
         <h1 className="text-2xl font-extrabold text-[var(--text-main)]">Build buy sheet</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Select SKUs → one click creates a <strong>Draft</strong> purchase order in Mongo.
+          A shopping list for restocking. Pick the rugs you need more of, set quantities, and one
+          click turns the list into a <strong>Draft</strong> purchase order for the vendor.
         </p>
+        <ol className="mt-3 grid gap-2 text-[12px] sm:grid-cols-3">
+          {[
+            ['1. Pick SKUs', 'Click + Add on any rug in the catalog. Clicking again adds one more.'],
+            ['2. Set qty & vendor', 'Adjust pieces per SKU and confirm the weaver / mill.'],
+            ['3. Create draft PO', 'Saved under Purchase Orders as Draft for review before sending.'],
+          ].map(([t, d]) => (
+            <li
+              key={t}
+              className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2"
+            >
+              <div className="font-bold text-[var(--text-main)]">{t}</div>
+              <div className="text-[var(--text-muted)]">{d}</div>
+            </li>
+          ))}
+        </ol>
       </header>
 
       {msg ? (

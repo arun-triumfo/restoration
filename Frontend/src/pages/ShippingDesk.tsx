@@ -14,7 +14,7 @@ function uploadsUrl(path?: string) {
 }
 
 export function ShippingDesk() {
-  const [carrier, setCarrier] = useState('FEDEX')
+  const [carrier, setCarrier] = useState('SHIPROCKET')
   const [weightKg, setWeightKg] = useState('5')
   const [fromZip, setFromZip] = useState('221001')
   const [toZip, setToZip] = useState('08817')
@@ -54,7 +54,7 @@ export function ShippingDesk() {
       })
       setRates(res.rates)
       if (res.rates[0]) setService(res.rates[0].service)
-      setMsg(`${res.carrierLabel}: ${res.rates.length} rates (sandbox)`)
+      setMsg(`${res.carrierLabel}: ${res.rates.length} rates (${res.mode || 'sandbox'})`)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Quote failed')
     } finally {
@@ -110,7 +110,9 @@ export function ShippingDesk() {
         </p>
         <h1 className="text-2xl font-extrabold text-[var(--text-main)]">Shipping · Rate → Label → Track</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          FedEx / DHL sandbox adapters. Labels save under <code>/uploads/labels</code> (S3 later).
+          Shiprocket, Aramex, ShipGlobal, FedEx and DHL in sandbox mode. Labels save under{' '}
+          <code>/uploads/labels</code>. Live AWBs switch on once courier API access is connected
+          in Integrations.
         </p>
       </header>
 
@@ -130,9 +132,15 @@ export function ShippingDesk() {
           Carrier
           <select
             value={carrier}
-            onChange={(e) => setCarrier(e.target.value)}
+            onChange={(e) => {
+              setCarrier(e.target.value)
+              setRates([])
+            }}
             className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm font-normal normal-case text-[var(--text-main)]"
           >
+            <option value="SHIPROCKET">Shiprocket (sandbox)</option>
+            <option value="ARAMEX">Aramex (sandbox)</option>
+            <option value="SHIPGLOBAL">ShipGlobal (sandbox)</option>
             <option value="FEDEX">FedEx (sandbox)</option>
             <option value="DHL">DHL (sandbox)</option>
           </select>
@@ -211,7 +219,7 @@ export function ShippingDesk() {
           <input
             value={trackAwb}
             onChange={(e) => setTrackAwb(e.target.value)}
-            placeholder="FX… / JD…"
+            placeholder="SR… / AX… / SG… / FX… / JD…"
             className="h-10 min-w-[12rem] flex-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm text-[var(--text-main)]"
           />
           <Button type="button" variant="secondary" disabled={busy} onClick={track}>

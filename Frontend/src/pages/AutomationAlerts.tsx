@@ -4,8 +4,6 @@ import { useApp } from '../context/AppContext'
 import { useData } from '../context/DataContext'
 import { Button } from '../components/ui/Button'
 import {
-  SEED_ALERTS,
-  SEED_RULES,
   mapApiAlert,
   mapApiRule,
   sevColor,
@@ -36,17 +34,14 @@ export function AutomationAlerts() {
   const [newName, setNewName] = useState('')
 
   const alerts = useMemo(() => {
-    const fromApi = apiAlerts.length
-      ? apiAlerts.map((r) => mapApiAlert(r as Record<string, unknown>))
-      : SEED_ALERTS
-    return fromApi.filter((a) => !a.resolved && !resolvedIds.has(a.id) && domainMatch(a.domain, domain))
+    return apiAlerts
+      .map((r) => mapApiAlert(r as Record<string, unknown>))
+      .filter((a) => !a.resolved && !resolvedIds.has(a.id) && domainMatch(a.domain, domain))
   }, [apiAlerts, resolvedIds, domain])
 
   const rules = useMemo(() => {
     if (localRules) return localRules
-    return apiRules.length
-      ? apiRules.map((r) => mapApiRule(r as Record<string, unknown>))
-      : SEED_RULES
+    return apiRules.map((r) => mapApiRule(r as Record<string, unknown>))
   }, [apiRules, localRules])
 
   const filteredRules = useMemo(() => {
@@ -65,9 +60,9 @@ export function AutomationAlerts() {
   const pausedRulesCount = rules.length - activeRulesCount
   const totalFired = rules.reduce((s, r) => s + (r.executionCount || 0), 0)
 
-  const barData = [3, 6, 4, 9, 5, 8, alerts.length + 4]
-  const barLabels = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Today']
-  const barMax = Math.max(...barData) || 1
+  const barData = [alerts.length]
+  const barLabels = ['Open']
+  const barMax = Math.max(...barData, 1)
   const bH = 48
   const bW = 26
   const bGap = 8
@@ -122,11 +117,11 @@ export function AutomationAlerts() {
   }
 
   const testFire = (rule: AutomationRule) => {
-    pushToast(`⚡ Test fire executed for ${rule.id} — ${rule.name}`, 'success')
+    pushToast(`Rule ${rule.id} is saved in Mongo. It fires when its condition is met.`, 'info')
   }
 
   const runSimulation = () => {
-    pushToast('⚡ Full SOW automation simulation complete — 9 rules evaluated.', 'success')
+    pushToast(`${activeRulesCount} active rules in the database. No dummy simulation.`, 'info')
   }
 
   const createRule = async () => {

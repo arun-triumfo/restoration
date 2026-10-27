@@ -1,6 +1,7 @@
 import { CreditCard, Shield } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { api, ApiError, type TenantDto } from '../api/client'
+import { Link } from 'react-router-dom'
+import { api, ApiError, type IntegrationConnection, type TenantDto } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/Button'
 
@@ -31,6 +32,7 @@ const PLANS = [
 export function Billing() {
   const { user, refreshMe } = useAuth()
   const [tenant, setTenant] = useState<TenantDto | null>(user?.tenant || null)
+  const [gateways, setGateways] = useState<IntegrationConnection[]>([])
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -39,6 +41,12 @@ export function Billing() {
     try {
       const res = await api.platform.myTenant()
       setTenant(res.tenant)
+      try {
+        const integ = await api.integrations.list()
+        setGateways(integ.data.filter((d) => d.channel === 'razorpay' || d.channel === 'stripe'))
+      } catch {
+        setGateways([])
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to load billing')
     }
@@ -59,10 +67,60 @@ export function Billing() {
         billingStatus: 'active',
       })
       setTenant(res.tenant)
-      setMsg(`Plan updated to ${res.tenant.planLabel || plan}. Stripe/Razorpay checkout comes next.`)
+      setMsg(`Plan updated to ${res.tenant.planLabel || plan}.`)
       await refreshMe()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Update failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const loadRazorpay = () =>
+    new Promise<void>((resolve, reject) => {
+      if (document.querySelector('script[src*="checkout.razorpay.com"]')) return resolve()
+      const s = document.createElement('script')
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      s.onload = () => resolve()
+      s.onerror = () => reject(new Error('Could not load Razorpay checkout'))
+      document.body.appendChild(s)
+    })
+
+  const pay = async (provider: string, plan: string) => {
+    setBusy(true)
+    setError(null)
+    setMsg(null)
+    try {
+      const res = await api.integrations.checkout(provider, {
+        plan,
+        successUrl: `${window.location.origin}/billing?paid=1`,
+        cancelUrl: `${window.location.origin}/billing?paid=0`,
+      })
+      if (res.free) {
+        setMsg(res.message || 'Starter is free')
+        return
+      }
+      if (res.url) {
+        window.location.href = res.url
+        return
+      }
+      if (res.orderId && res.keyId) {
+        await loadRazorpay()
+        const Razorpay = (window as unknown as { Razorpay: new (opts: object) => { open: () => void } }).Razorpay
+        const rzp = new Razorpay({
+          key: res.keyId,
+          order_id: res.orderId,
+          name: 'RugOS',
+          description: `Plan ${plan}`,
+          handler: () => {
+            setMsg('Payment received. Refreshing…')
+            load()
+          },
+        })
+        rzp.open()
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Checkout failed')
     } finally {
       setBusy(false)
     }
@@ -91,8 +149,12 @@ export function Billing() {
         </p>
         <h1 className="text-2xl font-extrabold text-[var(--text-main)]">Plan & subscription</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Module entitlements are stored per company. Live payment gateway (Stripe/Razorpay) waits on
-          Restoration keys — demo plan switch works now.
+          Super Admin can switch plans in demo. Live Razorpay / Stripe checkout starts the moment keys
+          are saved on{' '}
+          <Link to="/integrations" className="font-bold text-indigo-600 no-underline dark:text-indigo-300">
+            Integrations
+          </Link>
+          .
         </p>
       </header>
 
@@ -181,6 +243,19 @@ export function Billing() {
           >
             Suspend (test 402)
           </Button>
+          {gateways
+            .filter((g) => g.status === 'connected' && g.mode === 'live')
+            .map((g) => (
+              <Button
+                key={g.channel}
+                type="button"
+                variant="primary"
+                disabled={busy}
+                onClick={() => pay(g.channel, tenant?.plan || 'growth')}
+              >
+                Pay with {g.channel === 'razorpay' ? 'Razorpay' : 'Stripe'}
+              </Button>
+            ))}
         </div>
       ) : (
         <p className="text-[12px] text-[var(--text-dim)]">Only Super Admin can change plan.</p>

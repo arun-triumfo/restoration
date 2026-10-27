@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { MENU_PLAYBOOK, PLAYBOOK_SECTIONS } from '../data/menuPlaybook'
 import {
   DEMO_LOGINS,
   DEMO_PASSWORD,
@@ -19,7 +20,6 @@ import {
   DEPARTMENTS,
   FULL_TEST_FLOW,
   JOURNEY_STEPS,
-  MENU_GUIDE,
   OWNER_REQUIRED,
   SHIPPED,
   STATUS_META,
@@ -40,16 +40,16 @@ function StatusPill({ status }: { status: DevStatus }) {
 }
 
 export function SystemWorkflow() {
-  const [tab, setTab] = useState<Tab>('planned')
+  const [tab, setTab] = useState<Tab>('menus')
   const [activeDept, setActiveDept] = useState(DEPARTMENTS[0].id)
 
   const dept = DEPARTMENTS.find((d) => d.id === activeDept) || DEPARTMENTS[0]
 
   const tabs: { id: Tab; label: string; icon: typeof GitBranch }[] = [
-    { id: 'planned', label: 'Status & next steps', icon: Rocket },
+    { id: 'menus', label: 'How to use', icon: MapIcon },
     { id: 'journey', label: 'Business journey', icon: GitBranch },
     { id: 'departments', label: 'Users by dept', icon: Users },
-    { id: 'menus', label: 'Menu guide', icon: MapIcon },
+    { id: 'planned', label: 'What is left', icon: Rocket },
   ]
 
   const remainingCount = useMemo(() => OWNER_REQUIRED.length, [])
@@ -73,11 +73,9 @@ export function SystemWorkflow() {
             Platform status for Restoration
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)] sm:text-[15px]">
-            The sandbox ERP is ready to use today (login, roles, inventory, orders, packing,
-            shipping demo, multi-company isolation). Below:{' '}
-            <strong className="text-[var(--text-main)]">what is left</strong> and{' '}
-            <strong className="text-[var(--text-main)]">why</strong> — items waiting on Restoration
-            owner credentials (Amazon, Shopify, payment gateway, courier accounts).
+            Start on the <strong className="text-[var(--text-main)]">How to use</strong> tab — every
+            menu, in sidebar order, with purpose and clicks. Lists come from Mongo. Keys for live
+            Shopify / payments / couriers are under What is left.
           </p>
 
           <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -153,14 +151,25 @@ export function SystemWorkflow() {
                   key={c.title}
                   className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-3"
                 >
-                  <div className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                     {c.area}
+                    {c.priority ? (
+                      <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white">
+                        Priority
+                      </span>
+                    ) : null}
                   </div>
                   <div className="mt-0.5 text-sm font-bold text-[var(--text-main)]">{c.title}</div>
                   <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                     <strong className="text-amber-800 dark:text-amber-200">Why left: </strong>
                     {c.whyLeft}
                   </p>
+                  {c.received ? (
+                    <p className="mt-1.5 rounded-lg border border-sky-500/25 bg-sky-500/5 px-2 py-1.5 text-[11px] text-[var(--text-main)]">
+                      <strong className="text-sky-700 dark:text-sky-300">Received: </strong>
+                      {c.received}
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-[10px] font-bold uppercase text-[var(--text-dim)]">
                     Restoration should provide
                   </p>
@@ -499,45 +508,53 @@ export function SystemWorkflow() {
       {tab === 'menus' ? (
         <section className="space-y-4">
           <header className="px-1">
-            <h2 className="text-lg font-bold text-[var(--text-main)]">Every menu — what it is for</h2>
+            <h2 className="text-lg font-bold text-[var(--text-main)]">How to use every menu</h2>
             <p className="text-sm text-[var(--text-muted)]">
-              Same sidebar Restoration teams use. Status shows what is ready today.
+              Same order as the left sidebar. Purpose, who uses it, and the exact clicks. All lists
+              load from Mongo — Add / Edit / Delete on tables, not dummy screens.
             </p>
           </header>
-          {MENU_GUIDE.map((section) => (
+          {PLAYBOOK_SECTIONS.map((section) => (
             <div
-              key={section.section}
+              key={section}
               className="overflow-hidden rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)]"
             >
               <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-                {section.section}
+                {section}
               </div>
-              <ul className="divide-y divide-[var(--border-subtle)]">
-                {section.items.map((item) => (
-                  <li
-                    key={item.path + item.label}
-                    className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-bold text-[var(--text-main)]">{item.label}</span>
-                        <StatusPill status={item.status} />
+              <ol className="divide-y divide-[var(--border-subtle)]">
+                {MENU_PLAYBOOK.filter((m) => m.section === section).map((item) => (
+                  <li key={item.path} className="px-4 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-extrabold text-white">
+                            {item.step}
+                          </span>
+                          <span className="font-bold text-[var(--text-main)]">{item.label}</span>
+                          <span className="rounded-full bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-dim)]">
+                            {item.crud}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[13px] text-[var(--text-main)]">{item.purpose}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">Who: {item.who}</p>
+                        <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-[12px] text-[var(--text-muted)]">
+                          {item.steps.map((s) => (
+                            <li key={s}>{s}</li>
+                          ))}
+                        </ol>
                       </div>
-                      <p className="mt-0.5 text-[13px] text-[var(--text-muted)]">{item.plain}</p>
-                      {item.note ? (
-                        <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">{item.note}</p>
-                      ) : null}
+                      <Link
+                        to={item.path}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs font-bold text-[var(--text-main)] no-underline"
+                      >
+                        Open
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
                     </div>
-                    <Link
-                      to={item.path}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs font-bold text-[var(--text-main)] no-underline"
-                    >
-                      Open
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
                   </li>
                 ))}
-              </ul>
+              </ol>
             </div>
           ))}
         </section>

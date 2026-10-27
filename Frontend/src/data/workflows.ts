@@ -46,120 +46,78 @@ export const JOURNEY_STEPS: WorkflowStep[] = [
   {
     id: 'j1',
     step: 1,
-    title: 'Customer places an order',
-    plain: 'Someone buys a rug on Amazon, website, or wholesale.',
+    title: 'Set up Restoration',
+    plain: 'Company, people, warehouses, buyers, then paste API keys on Integrations.',
     detail:
-      'Orders from Amazon, Etsy, Shopify, Walmart and B2B buyers land in one Order Pipeline so the team does not hunt in five portals.',
+      'Do this once. Sidebar section “1 · Set up the company”. After keys are saved, Shopify/Amazon/couriers/payments go live.',
+    menuPath: '/company',
+    menuLabel: 'Company → Integrations',
+    department: 'Super Admin',
+    status: 'live',
+  },
+  {
+    id: 'j2',
+    step: 2,
+    title: 'Orders arrive',
+    plain: 'Amazon, website, or wholesale orders land in one pipeline (or Add Order by hand).',
+    detail: 'Photos come from the SKU. Sync now on Integrations pulls live channel orders once keys are saved.',
     menuPath: '/orders',
     menuLabel: 'Orders',
     department: 'Sales / Ops',
     status: 'live',
   },
   {
-    id: 'j2',
-    step: 2,
-    title: 'System checks stock',
-    plain: 'Does USA warehouse have the rug ready? Or must India make it?',
-    detail:
-      'Inventory shows free stock across India mill, ocean transit, Edison 3PL and Amazon FBA. If stock is low, alerts fire.',
+    id: 'j3',
+    step: 3,
+    title: 'Check stock',
+    plain: 'Does India, USA, or FBA have the rug? History shows every movement.',
+    detail: 'Inventory is the catalog. Warehouse Analytics is the same data as charts. Nothing here is dummy.',
     menuPath: '/inventory',
     menuLabel: 'Inventory',
     department: 'Warehouse',
     status: 'live',
   },
   {
-    id: 'j3',
-    step: 3,
-    title: 'Make or buy if needed',
-    plain: 'If not in stock, raise a purchase order or start loom (MTO) work.',
-    detail:
-      'Purchase Orders and MTO Jobs track weaving, packing QC and ready-to-ship status at Bhadohi.',
-    menuPath: '/purchase-orders',
-    menuLabel: 'Purchase Orders / MTO',
-    department: 'Production',
-    status: 'live',
-  },
-  {
     id: 'j4',
     step: 4,
-    title: 'Move stock between hubs',
-    plain: 'India packs containers; USA receives and puts rugs on shelf.',
-    detail:
-      'Stock Transfers track ocean/air moves, cartons, freight cost and receive confirmation at destination.',
-    menuPath: '/stock-transfers',
-    menuLabel: 'Stock Transfers',
-    department: 'Logistics',
+    title: 'Make or buy if stock is short',
+    plain: 'Forecast suggests qty → Buy Sheet creates a Draft PO → mill weaves (MTO) if needed.',
+    detail: 'Forecast uses live orders and on-hand stock. Buy Sheet does not email the mill until a human sends the PO.',
+    menuPath: '/forecast',
+    menuLabel: 'Forecast → Buy Sheet → PO / MTO',
+    department: 'SCM / India mill',
     status: 'live',
   },
   {
     id: 'j5',
     step: 5,
-    title: 'Ship to the customer',
-    plain: 'Create loading plan, AWB / label, and hand to courier.',
-    detail:
-      'Shipping & Loading Plans cover staging, FedEx/DHL style dispatch and tracking states.',
+    title: 'Move, pack, ship, export',
+    plain: 'Transfer India → USA, pack the order, buy an AWB, attach export papers.',
+    detail: 'Shipping Desk is sandbox until courier keys are saved on Integrations, then live rates/labels.',
     menuPath: '/shipping',
-    menuLabel: 'Shipping & Dispatch',
+    menuLabel: 'Transfers → Packing → Shipping → Export',
     department: 'Logistics',
     status: 'live',
   },
   {
     id: 'j6',
     step: 6,
-    title: 'Export paperwork (India → USA)',
-    plain: 'Commercial invoice, packing list, shipping bill for customs.',
-    detail:
-      'Export Docs suite holds the statutory pack needed for DGFT / ICEGATE style flows.',
-    menuPath: '/export-docs',
-    menuLabel: 'Export Docs',
-    department: 'Export / Finance',
+    title: 'After the sale',
+    plain: 'Returns, courier invoices, who owes money, then monthly/yearly profit.',
+    detail: 'Finance menus read Mongo receivables and financial rows. Add a month if books are missing — do not invent numbers in the UI.',
+    menuPath: '/receivables',
+    menuLabel: 'Returns → Audit → Receivables → Profit',
+    department: 'Finance',
     status: 'live',
   },
   {
     id: 'j7',
     step: 7,
-    title: 'Get paid & stay compliant',
-    plain: 'Track buyer payments and FEMA / e-BRC realization deadlines.',
-    detail:
-      'Receivables ageing and FEMA sentinels warn before the 210-day export realization clock runs out.',
-    menuPath: '/receivables',
-    menuLabel: 'Receivables',
-    department: 'Finance',
-    status: 'live',
-  },
-  {
-    id: 'j8',
-    step: 8,
-    title: 'Know true profit',
-    plain: 'After courier bills and duties, see what each order really earned.',
-    detail:
-      'Profitability replaces estimates with audited freight and shows margin by SKU, channel and order.',
-    menuPath: '/profitability',
-    menuLabel: 'Profitability',
-    department: 'Finance / Management',
-    status: 'live',
-  },
-  {
-    id: 'j9',
-    step: 9,
-    title: 'Plan the next buy',
-    plain: 'Which rugs are running out? What should we buy or stop buying?',
-    detail:
-      'Demand Forecast workbench uses moving averages, safety stock and reorder points — no black-box AI.',
-    menuPath: '/forecast',
-    menuLabel: 'Demand Forecast',
-    department: 'Planning / SCM',
-    status: 'live',
-  },
-  {
-    id: 'j10',
-    step: 10,
-    title: 'Alerts keep everyone honest',
-    plain: 'Low stock, late orders, courier overcharge, unpaid exports — auto pings.',
-    detail:
-      'Automation & Alerts engine has rules for stock, SLA, courier variance and FEMA — plus notification channels.',
+    title: 'Watch the system',
+    plain: 'Alerts, failed sync jobs, and the audit log.',
+    detail: 'Alerts come from Mongo. If the list is empty, nothing is firing — that is real, not a missing demo.',
     menuPath: '/alerts',
-    menuLabel: 'Automation & Alerts',
+    menuLabel: 'Alerts / Failed Jobs / Logs',
     department: 'All',
     status: 'live',
   },
@@ -494,6 +452,9 @@ export type OwnerRequirement = {
   area: string
   provide: string[]
   readyNow: string
+  /** What Restoration has already shared, if anything */
+  received?: string
+  priority?: boolean
 }
 
 /** Alias kept for older imports */
@@ -509,7 +470,39 @@ export const OWNER_REQUIRED: OwnerRequirement[] = [
       'Webhook signing secret',
       'Preferred currency (USD / INR) and plan prices',
     ],
-    readyNow: 'Plan switch UI and suspend lock already work in demo mode.',
+    readyNow:
+      'Admin pastes Key ID + Secret on Integrations → Razorpay (Live). Test pings Razorpay; Pay on Billing opens checkout. Webhook URL is /api/webhooks/razorpay.',
+    received:
+      'Razorpay dashboard login shared. Next: generate Key ID + Key Secret from that dashboard and paste them on Integrations.',
+  },
+  {
+    title: 'Shopify Admin API',
+    whyLeft: 'Waiting on Restoration Shopify store domain and Admin API token.',
+    area: 'Marketplace',
+    provide: [
+      'Shopify store domain (xxx.myshopify.com)',
+      'Admin API access token (or OAuth app ID / secret)',
+      'Which locations map to USA warehouse / FBA',
+    ],
+    readyNow:
+      'Admin pastes shop domain + Admin API token on Integrations → Shopify (Live). Test pings the shop; Sync now pulls live orders with SKU images.',
+    received:
+      'Store website (odetterugs.com) and Shopify login shared. Next: create a custom app and paste the shpat_ token plus xxx.myshopify.com on Integrations.',
+  },
+  {
+    title: 'Aramex / Shiprocket / ShipGlobal.in (priority couriers)',
+    whyLeft:
+      'Set up first, ahead of FedEx / DHL. Waiting on API-enabled user IDs for each courier account.',
+    area: 'Shipping',
+    priority: true,
+    provide: [
+      'Shiprocket: API user email + password (Settings → API → Configure)',
+      'Aramex: username, password, account number, account PIN, account entity + country',
+      'ShipGlobal.in: integration user ID + API key / password',
+    ],
+    readyNow:
+      'Admin pastes courier user ID + password on Integrations (Live). Test logs into the courier. Shipping Desk then uses live rates / labels for that carrier.',
+    received: 'User IDs and passwords are being shared — paste them on Integrations when ready.',
   },
   {
     title: 'Amazon Selling Partner API (SP-API)',
@@ -521,36 +514,29 @@ export const OWNER_REQUIRED: OwnerRequirement[] = [
       'Marketplace IDs (e.g. ATVPDKIKX0DER)',
       'AWS IAM role ARN if required by the SP-API app',
     ],
-    readyNow: 'Sandbox Connect / Sync Now already imports sample Amazon-style orders.',
-  },
-  {
-    title: 'Shopify Admin API',
-    whyLeft: 'Waiting on Restoration Shopify store domain and Admin API token.',
-    area: 'Marketplace',
-    provide: [
-      'Shopify store domain (xxx.myshopify.com)',
-      'Admin API access token (or OAuth app ID / secret)',
-      'Which locations map to USA warehouse / FBA',
-    ],
-    readyNow: 'Sandbox sync already creates Shopify-style orders in the pipeline.',
+    readyNow:
+      'Admin pastes LWA App ID, secret and refresh token on Integrations → Amazon (Live). Test exchanges the token; Sync now pulls SP-API orders.',
   },
   {
     title: 'Etsy / Walmart / other channels (optional)',
     whyLeft: 'Optional — only if Restoration wants those channels live.',
     area: 'Marketplace',
     provide: ['API keys / OAuth apps per channel', 'SKU mapping rules'],
-    readyNow: 'Etsy sandbox connector stub follows the same pattern as Shopify.',
+    readyNow:
+      'Admin pastes shop id + API key + OAuth token on Integrations → Etsy (Live). Test and Sync use the Etsy Open API.',
   },
   {
     title: 'FedEx / DHL (live courier)',
-    whyLeft: 'Waiting on Restoration carrier account credentials for real AWBs.',
+    whyLeft:
+      'Waiting on Restoration carrier account credentials for real AWBs. Scheduled after the priority couriers above.',
     area: 'Shipping',
     provide: [
       'FedEx account + API key / secret (or DHL Express credentials)',
       'Meter number / account ZIP',
       'Optional: cloud storage bucket for production label files',
     ],
-    readyNow: 'Sandbox Rate → Label → Track works today with printable local labels.',
+    readyNow:
+      'Admin pastes FedEx / DHL API keys on Integrations (Live). Shipping Desk switches that carrier to live rates and labels automatically.',
   },
   {
     title: 'Production URLs & backup owner',
@@ -749,6 +735,8 @@ export const SHIPPED = [
       'Labels on disk `/uploads/labels` (prod S3 = Restoration bucket)',
       'Packing Station: scan + photo + role lock',
       'Buy Sheet → Draft PO API',
+      'Order, inventory and warehouse photos (order image comes from its SKU automatically)',
+      'Shiprocket / Aramex / ShipGlobal sandbox + encrypted credential slots',
     ],
   },
   {

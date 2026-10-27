@@ -10,7 +10,33 @@ export interface ColumnDef {
   type?: FieldType
   options?: string[]
   /** Nested path e.g. stock.indiaAvailable — display only */
-  format?: 'currency' | 'badge' | 'bool'
+  format?: 'currency' | 'badge' | 'bool' | 'image'
+  /** For image columns: resolve the URL when the row has none */
+  image?: {
+    /** Look up another resource, e.g. order.sku → skus.imageUrl */
+    from?: { resource: string; localKey: string; foreignKey: string; field: string }
+    fallback?: (row: Record<string, unknown>) => string
+  }
+}
+
+const RUG_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1600121848594-d8644e57abab?auto=format&fit=crop&w=160&q=70'
+
+const WAREHOUSE_PHOTOS = {
+  origin: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=320&q=70',
+  threePl: 'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=320&q=70',
+  fba: 'https://images.unsplash.com/photo-1587293852726-70cdb56c2866?auto=format&fit=crop&w=320&q=70',
+  icd: 'https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=320&q=70',
+  port: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=320&q=70',
+}
+
+export function warehousePhoto(row: Record<string, unknown>): string {
+  const t = `${row.type ?? ''} ${row.name ?? ''} ${row.city ?? ''}`.toLowerCase()
+  if (/fba|amazon/.test(t)) return WAREHOUSE_PHOTOS.fba
+  if (/origin|factory|manufactur/.test(t)) return WAREHOUSE_PHOTOS.origin
+  if (/\bicd\b|container depot|air freight/.test(t)) return WAREHOUSE_PHOTOS.icd
+  if (/\bport\b|europe|bonded|hamburg/.test(t)) return WAREHOUSE_PHOTOS.port
+  return WAREHOUSE_PHOTOS.threePl
 }
 
 export interface ResourceMeta {
@@ -45,6 +71,11 @@ export const RESOURCE_META: ResourceMeta[] = [
     subtitle: 'SKU master and multi-warehouse stock',
     path: '/inventory',
     columns: [
+      col('imageUrl', 'Image', {
+        format: 'image',
+        form: false,
+        image: { fallback: () => RUG_PLACEHOLDER },
+      }),
       col('sku', 'SKU'),
       col('odetteSku', 'Restoration SKU'),
       col('title', 'Title', { type: 'textarea' }),
@@ -64,6 +95,14 @@ export const RESOURCE_META: ResourceMeta[] = [
     subtitle: 'Marketplace orders and fulfillment',
     path: '/orders',
     columns: [
+      col('imageUrl', 'Image', {
+        format: 'image',
+        form: false,
+        image: {
+          from: { resource: 'skus', localKey: 'sku', foreignKey: 'sku', field: 'imageUrl' },
+          fallback: () => RUG_PLACEHOLDER,
+        },
+      }),
       col('orderId', 'Order ID'),
       col('channel', 'Channel'),
       col('buyerName', 'Buyer'),
@@ -83,6 +122,11 @@ export const RESOURCE_META: ResourceMeta[] = [
     subtitle: 'Global warehouse nodes and capacity',
     path: '/warehouses',
     columns: [
+      col('imageUrl', 'Photo', {
+        format: 'image',
+        form: false,
+        image: { fallback: warehousePhoto },
+      }),
       col('id', 'ID'),
       col('name', 'Name'),
       col('type', 'Type'),
@@ -90,6 +134,7 @@ export const RESOURCE_META: ResourceMeta[] = [
       col('city', 'City'),
       col('capacityCBM', 'Capacity CBM', { type: 'number' }),
       col('address', 'Address', { type: 'textarea', table: false }),
+      col('imageUrl', 'Photo URL (optional)', { table: false }),
     ],
   },
   {
@@ -255,7 +300,7 @@ export const RESOURCE_META: ResourceMeta[] = [
     path: '/receivables',
     columns: [
       col('invoiceNo', 'Invoice'),
-      col('client', 'Client'),
+      col('client', 'Company'),
       col('orderId', 'Order'),
       col('dueDate', 'Due'),
       col('currency', 'Currency'),

@@ -1,14 +1,21 @@
-import { getResourceModel } from '../models/createResourceModel.js'
 import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
-import { decryptSecret, encryptSecret, maskSecret } from '../utils/secrets.js'
+import { CATALOG, CHANNEL_IDS, publicCatalog } from '../integrations/catalog.js'
+import {
+  Creds,
+  credId,
+  decryptFields,
+  mergeEncryptedFields,
+  missingRequired,
+  publicConnection,
+} from '../integrations/creds.js'
+import { ADAPTERS, runSync, runTest } from '../integrations/index.js'
+import { getResourceModel } from '../models/createResourceModel.js'
 
-const CHANNELS = ['shopify', 'amazon', 'etsy']
-
-function Creds() {
-  return getResourceModel('integration_credentials', 'id', true)
-}
 function Orders() {
   return getResourceModel('orders', 'orderId', true)
+}
+function Skus() {
+  return getResourceModel('skus', 'sku', true)
 }
 function Workers() {
   return getResourceModel('integration_workers', 'id', true)
@@ -16,49 +23,25 @@ function Workers() {
 function Failed() {
   return getResourceModel('failed_jobs', 'jobId', true)
 }
+function Tenants() {
+  return getResourceModel('tenants', 'id', true)
+}
 
 function tenantIdOf(req) {
   return req.user?.tenantId || DEFAULT_TENANT_ID
 }
 
-function credId(tenantId, channel) {
-  return `${tenantId}__${channel}`
-}
-
-function publicCred(doc) {
-  if (!doc) return null
-  return {
-    id: doc.id,
-    channel: doc.channel,
-    status: doc.status || 'disconnected',
-    shopDomain: doc.shopDomain || null,
-    lastSyncAt: doc.lastSyncAt || null,
-    lastError: doc.lastError || null,
-    hasSecret: Boolean(doc.secretEnc),
-    secretHint: doc.secretHint || null,
-    meta: doc.meta || {},
-  }
+function originOf(req) {
+  return `${req.protocol}://${req.get('host')}`
 }
 
 export async function listConnections(req, res) {
   try {
     const tid = tenantIdOf(req)
-    const rows = await Creds()
-      .find({ tenantId: tid })
-      .lean()
-    const byChannel = Object.fromEntries(rows.map((r) => [r.channel, publicCred(r)]))
-    const data = CHANNELS.map((ch) => byChannel[ch] || {
-      id: credId(tid, ch),
-      channel: ch,
-      status: 'disconnected',
-      shopDomain: null,
-      lastSyncAt: null,
-      lastError: null,
-      hasSecret: false,
-      secretHint: null,
-      meta: {},
-    })
-    res.json({ success: true, data })
+    const rows = await Creds().find({ tenantId: tid }).lean()
+    const by = Object.fromEntries(rows.map((r) => [r.channel, r]))
+    const data = CHANNEL_IDS.map((ch) => publicConnection(by[ch], ch))
+    res.json({ success: true, catalog: publicCatalog(originOf(req)), data })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
   }
@@ -67,37 +50,75 @@ export async function listConnections(req, res) {
 export async function connectChannel(req, res) {
   try {
     const channel = String(req.params.channel || '').toLowerCase()
-    if (!CHANNELS.includes(channel)) {
-      return res.status(400).json({ success: false, message: `channel must be one of ${CHANNELS.join(', ')}` })
+    const cat = CATALOG[channel]
+    if (!cat) {
+      return res.status(400).json({ success: false, message: `Unknown channel. Use: ${CHANNEL_IDS.join(', ')}` })
     }
     const tid = tenantIdOf(req)
-    const apiKey = String(req.body?.apiKey || req.body?.accessToken || '').trim()
-    const shopDomain = String(req.body?.shopDomain || req.body?.sellerId || '').trim()
-    if (!apiKey) {
-      return res.status(400).json({ success: false, message: 'apiKey / accessToken required' })
-    }
+    const incoming = { ...(req.body?.fields || req.body || {}) }
+    // Back-compat aliases from the older 2-field form
+    if (incoming.apiKey && !incoming.accessToken) incoming.accessToken = incoming.apiKey
+    if (incoming.password && !incoming.apiKey) incoming.apiKey = incoming.password
+    if (incoming.username && !incoming.email) incoming.email = incoming.username
+    if (incoming.shopDomain && !incoming.email && cat.kind === 'courier') incoming.email = incoming.shopDomain
 
     const id = credId(tid, channel)
-    const doc = await Creds().findOneAndUpdate(
-      { id },
-      {
-        $set: {
-          id,
-          channel,
-          tenantId: tid,
-          shopDomain: shopDomain || null,
-          secretEnc: encryptSecret(apiKey),
-          secretHint: maskSecret(apiKey),
-          status: 'connected',
-          lastError: null,
-          meta: {
-            mode: req.body?.mode === 'live' ? 'live' : 'sandbox',
-            connectedAt: new Date().toISOString(),
+    const existing = await Creds().findOne({ id }).lean()
+    const { fieldsEnc, fieldHints } = mergeEncryptedFields(existing?.fieldsEnc, incoming, cat)
+    const mergedFields = decryptFields({ ...existing, fieldsEnc })
+    const mode = req.body?.mode === 'sandbox' ? 'sandbox' : 'live'
+    if (mode === 'live') {
+      const miss = missingRequired(mergedFields, cat)
+      if (miss.length) {
+        return res.status(400).json({ success: false, message: `Missing: ${miss.join(', ')}` })
+      }
+    }
+
+    const shopDomain = mergedFields.shopDomain || mergedFields.email || mergedFields.username || null
+    const doc = await Creds()
+      .findOneAndUpdate(
+        { id },
+        {
+          $set: {
+            id,
+            channel,
+            tenantId: tid,
+            shopDomain,
+            fieldsEnc,
+            fieldHints,
+            status: 'connected',
+            lastError: null,
+            secretEnc: '',
+            secretHint: Object.values(fieldHints)[0] || null,
+            meta: {
+              mode,
+              kind: cat.kind,
+              connectedAt: new Date().toISOString(),
+              connectedBy: req.user?.email,
+            },
           },
         },
-      },
-      { upsert: true, new: true },
-    ).lean()
+        { upsert: true, new: true },
+      )
+      .lean()
+
+    let verify = null
+    if (mode === 'live') {
+      try {
+        verify = await runTest(channel, mergedFields, 'live')
+        await Creds().findOneAndUpdate(
+          { id },
+          { $set: { lastError: null, 'meta.lastVerifiedAt': new Date().toISOString() } },
+        )
+      } catch (err) {
+        await Creds().findOneAndUpdate({ id }, { $set: { lastError: err.message, status: 'error' } })
+        return res.status(400).json({
+          success: false,
+          connection: publicConnection({ ...doc, status: 'error', lastError: err.message }, channel),
+          message: err.message,
+        })
+      }
+    }
 
     await Workers().findOneAndUpdate(
       { id: `worker-${channel}-${tid}` },
@@ -114,7 +135,11 @@ export async function connectChannel(req, res) {
       { upsert: true },
     )
 
-    res.json({ success: true, connection: publicCred(doc), message: `${channel} connected (credentials encrypted)` })
+    res.json({
+      success: true,
+      connection: publicConnection(doc, channel),
+      message: verify?.message || `${cat.label} saved (${mode}).`,
+    })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
   }
@@ -124,10 +149,9 @@ export async function disconnectChannel(req, res) {
   try {
     const channel = String(req.params.channel || '').toLowerCase()
     const tid = tenantIdOf(req)
-    const id = credId(tid, channel)
     await Creds().findOneAndUpdate(
-      { id, tenantId: tid },
-      { $set: { status: 'disconnected', secretEnc: '', lastError: null } },
+      { id: credId(tid, channel), tenantId: tid },
+      { $set: { status: 'disconnected', fieldsEnc: {}, lastError: null, secretEnc: '' } },
     )
     res.json({ success: true, message: `${channel} disconnected` })
   } catch (err) {
@@ -140,122 +164,163 @@ export async function testChannel(req, res) {
     const channel = String(req.params.channel || '').toLowerCase()
     const tid = tenantIdOf(req)
     const doc = await Creds().findOne({ id: credId(tid, channel), tenantId: tid }).lean()
-    if (!doc || doc.status !== 'connected' || !doc.secretEnc) {
-      return res.status(400).json({ success: false, message: 'Connect credentials first' })
+    if (!doc || doc.status === 'disconnected') {
+      return res.status(400).json({ success: false, message: 'Save keys first' })
     }
-    const secret = decryptSecret(doc.secretEnc)
-    // Sandbox: prove decrypt works; live APIs land in later tickets
-    const ok = Boolean(secret)
-    res.json({
-      success: ok,
-      channel,
-      mode: doc.meta?.mode || 'sandbox',
-      message: ok
-        ? `${channel} credentials decrypt OK (${doc.meta?.mode || 'sandbox'}). Live API ping comes with OAuth tickets.`
-        : 'Decrypt failed',
-    })
+    const fields = decryptFields(doc)
+    const mode = doc.meta?.mode || 'sandbox'
+    const result = await runTest(channel, fields, mode)
+    await Creds().findOneAndUpdate(
+      { id: doc.id },
+      { $set: { lastError: null, status: 'connected', 'meta.lastVerifiedAt': new Date().toISOString() } },
+    )
+    res.json({ success: true, channel, mode, message: result.message })
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message })
+    const channel = String(req.params.channel || '').toLowerCase()
+    const tid = tenantIdOf(req)
+    await Creds()
+      .findOneAndUpdate({ id: credId(tid, channel) }, { $set: { lastError: err.message } })
+      .catch(() => {})
+    res.status(400).json({ success: false, channel, message: err.message })
   }
 }
 
-/** Pull mock / normalized orders into tenant Orders collection */
 export async function syncChannel(req, res) {
   const channel = String(req.params.channel || '').toLowerCase()
   const tid = tenantIdOf(req)
   const jobId = `job-${channel}-${Date.now()}`
   try {
-    if (!CHANNELS.includes(channel)) {
-      return res.status(400).json({ success: false, message: 'Unknown channel' })
+    const cat = CATALOG[channel]
+    if (cat?.kind !== 'marketplace') {
+      return res.status(400).json({
+        success: false,
+        message: cat?.kind === 'courier' ? 'Couriers use Shipping Desk for rates and labels' : 'Not a marketplace',
+      })
     }
     const cred = await Creds().findOne({ id: credId(tid, channel), tenantId: tid }).lean()
-    if (!cred || cred.status !== 'connected') {
-      return res.status(400).json({ success: false, message: 'Connect channel before sync' })
+    if (!cred || cred.status === 'disconnected') {
+      return res.status(400).json({ success: false, message: 'Save keys first' })
     }
-
     await Workers().findOneAndUpdate(
       { id: `worker-${channel}-${tid}` },
       { $set: { status: 'Running', lastHeartbeat: new Date().toISOString() } },
       { upsert: true },
     )
-
-    const created = []
-    if (channel === 'shopify' || channel === 'amazon' || channel === 'etsy') {
-      const stamp = Date.now().toString().slice(-6)
-      const samples = [
-        {
-          orderId: `${channel.toUpperCase().slice(0, 3)}-${stamp}-1`,
-          channel: channel === 'shopify' ? 'Shopify' : channel === 'amazon' ? 'Amazon' : 'Etsy',
-          buyerName: channel === 'amazon' ? 'Amazon Customer' : 'Web Customer',
-          status: 'Pending Allocation',
-          sku: 'DEMO-RUG-001',
-          qty: 1,
-          amount: channel === 'amazon' ? 189 : 149,
-          currency: 'USD',
-          marketplaceId: `${channel}_${stamp}_1`,
-          source: `${channel}_sync`,
-          tenantId: tid,
-        },
-        {
-          orderId: `${channel.toUpperCase().slice(0, 3)}-${stamp}-2`,
-          channel: channel === 'shopify' ? 'Shopify' : channel === 'amazon' ? 'Amazon' : 'Etsy',
-          buyerName: 'Repeat Buyer',
-          status: 'Pending Allocation',
-          sku: 'DEMO-RUG-002',
-          qty: 2,
-          amount: 298,
-          currency: 'USD',
-          marketplaceId: `${channel}_${stamp}_2`,
-          source: `${channel}_sync`,
-          tenantId: tid,
-        },
-      ]
-
-      for (const row of samples) {
-        await Orders().findOneAndUpdate(
-          { orderId: row.orderId, tenantId: tid },
-          { $set: row },
-          { upsert: true },
-        )
-        created.push(row.orderId)
-      }
+    const catalog = await Skus().find({ tenantId: tid }).limit(80).lean()
+    const { imported, message } = await runSync(channel, decryptFields(cred), cred.meta?.mode || 'sandbox', {
+      tenantId: tid,
+      catalog,
+    })
+    const orderIds = []
+    for (const row of imported) {
+      await Orders().findOneAndUpdate({ orderId: row.orderId, tenantId: tid }, { $set: row }, { upsert: true })
+      orderIds.push(row.orderId)
     }
-
     const now = new Date().toISOString()
-    await Creds().findOneAndUpdate(
-      { id: credId(tid, channel) },
-      { $set: { lastSyncAt: now, lastError: null } },
-    )
+    await Creds().findOneAndUpdate({ id: credId(tid, channel) }, { $set: { lastSyncAt: now, lastError: null, status: 'connected' } })
     await Workers().findOneAndUpdate(
       { id: `worker-${channel}-${tid}` },
-      { $set: { status: 'Idle', lastHeartbeat: now, lastSyncAt: now, lastResult: `imported ${created.length}` } },
+      { $set: { status: 'Idle', lastHeartbeat: now, lastSyncAt: now, lastResult: `imported ${orderIds.length}` } },
     )
-
-    res.json({
-      success: true,
-      channel,
-      imported: created.length,
-      orderIds: created,
-      message:
-        channel === 'shopify'
-          ? 'Shopify sandbox sync: sample orders upserted (replace with Admin API ingest next).'
-          : channel === 'amazon'
-            ? 'Amazon SP-API phase-1 sandbox: sample orders upserted.'
-            : 'Etsy sandbox sync complete.',
-    })
+    res.json({ success: true, channel, imported: orderIds.length, orderIds, message })
   } catch (err) {
-    await Failed().create({
-      jobId,
-      channel,
-      tenantId: tid,
-      error: err.message,
-      status: 'failed',
-      createdAt: new Date().toISOString(),
-    }).catch(() => {})
-    await Creds().findOneAndUpdate(
-      { id: credId(tid, channel) },
-      { $set: { lastError: err.message, status: 'error' } },
-    ).catch(() => {})
+    await Failed()
+      .create({
+        jobId,
+        channel,
+        tenantId: tid,
+        error: err.message,
+        status: 'failed',
+        createdAt: new Date().toISOString(),
+      })
+      .catch(() => {})
+    await Creds()
+      .findOneAndUpdate({ id: credId(tid, channel) }, { $set: { lastError: err.message, status: 'error' } })
+      .catch(() => {})
     res.status(500).json({ success: false, message: err.message, jobId })
+  }
+}
+
+const PLAN_PRICE = {
+  starter: { INR: 0, USD: 0 },
+  growth: { INR: 4900, USD: 59 },
+  enterprise: { INR: 14900, USD: 179 },
+}
+
+export async function createCheckout(req, res) {
+  try {
+    const channel = String(req.params.channel || req.body?.provider || 'razorpay').toLowerCase()
+    if (!['razorpay', 'stripe'].includes(channel)) {
+      return res.status(400).json({ success: false, message: 'provider must be razorpay or stripe' })
+    }
+    const tid = tenantIdOf(req)
+    const doc = await Creds().findOne({ id: credId(tid, channel), tenantId: tid }).lean()
+    if (!doc || doc.status === 'disconnected') {
+      return res.status(400).json({ success: false, message: `Save ${channel} keys on Integrations first` })
+    }
+    const fields = decryptFields(doc)
+    const plan = String(req.body?.plan || 'growth').toLowerCase()
+    const currency = String(req.body?.currency || fields.currency || (channel === 'razorpay' ? 'INR' : 'usd')).toUpperCase()
+    const amount = Number(req.body?.amount) || PLAN_PRICE[plan]?.[currency] || PLAN_PRICE[plan]?.USD || 59
+    if (!amount) {
+      return res.json({ success: true, message: 'Starter is free — plan switched without checkout', free: true, plan })
+    }
+    const a = ADAPTERS[channel]
+    const origin = originOf(req)
+    const result = await a.createCheckout(fields, {
+      amount,
+      currency,
+      receipt: `rugos-${tid}-${plan}-${Date.now()}`,
+      notes: { tenantId: tid, plan },
+      plan,
+      successUrl: req.body?.successUrl || `${origin}/billing?paid=1`,
+      cancelUrl: req.body?.cancelUrl || `${origin}/billing?paid=0`,
+    })
+    res.json({ success: true, ...result })
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message })
+  }
+}
+
+async function markPaid(tenantId, plan) {
+  if (!tenantId) return
+  const patch = { billingStatus: 'active', status: 'active' }
+  if (plan) patch.plan = plan
+  await Tenants().findOneAndUpdate({ id: tenantId }, { $set: patch })
+}
+
+export async function webhookRazorpay(req, res) {
+  try {
+    const tid = String(req.body?.payload?.order?.entity?.notes?.tenantId || req.query.tenantId || '')
+    if (!tid) return res.status(400).json({ success: false, message: 'tenantId missing on payload' })
+    const doc = await Creds().findOne({ id: credId(tid, 'razorpay') }).lean()
+    if (doc) {
+      const { verifyWebhook } = await import('../integrations/adapters/razorpay.js')
+      verifyWebhook(decryptFields(doc), JSON.stringify(req.body), req.get('X-Razorpay-Signature'))
+    }
+    const plan = req.body?.payload?.order?.entity?.notes?.plan
+    await markPaid(tid, plan)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message })
+  }
+}
+
+export async function webhookStripe(req, res) {
+  try {
+    const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body)
+    const event = JSON.parse(raw)
+    const tid = event?.data?.object?.metadata?.tenantId || req.query.tenantId
+    if (tid) {
+      const doc = await Creds().findOne({ id: credId(tid, 'stripe') }).lean()
+      if (doc) {
+        const { verifyWebhook } = await import('../integrations/adapters/stripe.js')
+        verifyWebhook(decryptFields(doc), raw, req.get('Stripe-Signature'))
+      }
+      await markPaid(tid, event?.data?.object?.metadata?.plan)
+    }
+    res.json({ success: true })
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message })
   }
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import {
   connectChannel,
+  createCheckout,
   disconnectChannel,
   listConnections,
   syncChannel,
@@ -20,5 +21,6 @@ router.post('/:channel/connect', requirePermission('integration_workers', 'write
 router.post('/:channel/disconnect', requirePermission('integration_workers', 'write'), disconnectChannel)
 router.post('/:channel/test', requirePermission('integration_workers', 'read'), testChannel)
 router.post('/:channel/sync', requirePermission('integration_workers', 'write'), syncChannel)
+router.post('/:channel/checkout', requirePermission('integration_workers', 'write'), createCheckout)
 
 export default router

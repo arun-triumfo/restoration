@@ -3,6 +3,8 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { getCarrier } from '../carriers/sandboxFedEx.js'
 import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
+import { loadLive } from '../integrations/creds.js'
+import { channelFromCarrier, liveCourierAdapter } from '../integrations/index.js'
 import { getResourceModel } from '../models/createResourceModel.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -24,6 +26,18 @@ function Logs() {
   return getResourceModel('system_logs', 'id', true)
 }
 
+async function resolveCarrier(tenantId, code) {
+  const channel = channelFromCarrier(code)
+  if (channel) {
+    const live = await loadLive(tenantId, channel)
+    if (live) {
+      const adapter = liveCourierAdapter(channel, live.fields)
+      if (adapter) return { carrier: adapter, mode: 'live' }
+    }
+  }
+  return { carrier: getCarrier(code), mode: 'sandbox' }
+}
+
 async function audit(req, action, detail) {
   try {
     await Logs().create({
@@ -41,7 +55,7 @@ async function audit(req, action, detail) {
 
 export async function quoteRates(req, res) {
   try {
-    const carrier = getCarrier(req.body?.carrier || 'FEDEX')
+    const { carrier, mode } = await resolveCarrier(tenantIdOf(req), req.body?.carrier || 'SHIPROCKET')
     const rates = await carrier.getRates({
       weightKg: Number(req.body?.weightKg) || 5,
       fromZip: req.body?.fromZip || '221001',
@@ -53,7 +67,7 @@ export async function quoteRates(req, res) {
       carrier: carrier.code,
       carrierLabel: carrier.label,
       rates,
-      mode: 'sandbox',
+      mode,
     })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
@@ -63,7 +77,7 @@ export async function quoteRates(req, res) {
 export async function buyLabel(req, res) {
   try {
     const tid = tenantIdOf(req)
-    const carrier = getCarrier(req.body?.carrier || 'FEDEX')
+    const { carrier, mode } = await resolveCarrier(tid, req.body?.carrier || 'SHIPROCKET')
     const label = await carrier.buyLabel({
       service: req.body?.service || 'FEDEX_GROUND',
       weightKg: Number(req.body?.weightKg) || 5,
@@ -104,8 +118,9 @@ export async function buyLabel(req, res) {
 
     res.status(201).json({
       success: true,
-      shipment: doc,
-      message: 'Sandbox label created. Open labelUrl to print.',
+      shipment: { ...doc, mode },
+      mode,
+      message: mode === 'live' ? 'Live label created. Open print link.' : 'Sandbox label created. Open print link.',
     })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
@@ -119,8 +134,8 @@ export async function trackShipment(req, res) {
     if (!awb) return res.status(400).json({ success: false, message: 'awb required' })
 
     const existing = await Shipments().findOne({ awb, tenantId: tid }).lean()
-    const carrierCode = existing?.carrier || req.query.carrier || 'FEDEX'
-    const carrier = getCarrier(carrierCode)
+    const carrierCode = existing?.carrier || req.query.carrier || req.body?.carrier || 'SHIPROCKET'
+    const { carrier, mode } = await resolveCarrier(tid, carrierCode)
     const tracked = await carrier.track(awb)
 
     const events = existing?.events?.length
@@ -145,7 +160,7 @@ export async function trackShipment(req, res) {
       )
       .lean()
 
-    res.json({ success: true, shipment: updated, mode: 'sandbox' })
+    res.json({ success: true, shipment: updated, mode })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
   }

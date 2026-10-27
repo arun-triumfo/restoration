@@ -40,7 +40,27 @@ const MONGODB_URI =
 app.set('trust proxy', 1)
 app.use(buildHelmet())
 app.use(buildCors())
+app.post(
+  '/api/webhooks/stripe',
+  express.raw({ type: 'application/json' }),
+  async (req, res, next) => {
+    try {
+      const { webhookStripe } = await import('./controllers/integrationsController.js')
+      return webhookStripe(req, res)
+    } catch (err) {
+      next(err)
+    }
+  },
+)
 app.use(express.json({ limit: '8mb' }))
+app.post('/api/webhooks/razorpay', async (req, res, next) => {
+  try {
+    const { webhookRazorpay } = await import('./controllers/integrationsController.js')
+    return webhookRazorpay(req, res)
+  } catch (err) {
+    next(err)
+  }
+})
 app.use(morgan('dev'))
 app.use('/api/', apiRateLimiter())
 

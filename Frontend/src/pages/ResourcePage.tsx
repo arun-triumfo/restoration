@@ -20,6 +20,20 @@ function cellValue(row: ResourceRow, col: ColumnDef): string {
   return String(raw)
 }
 
+function Thumb({ src, fallback }: { src: string; fallback: string }) {
+  return (
+    <img
+      src={src || fallback}
+      alt=""
+      loading="lazy"
+      onError={(e) => {
+        if (fallback && e.currentTarget.src !== fallback) e.currentTarget.src = fallback
+      }}
+      className="h-11 w-11 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] object-cover"
+    />
+  )
+}
+
 function emptyForm(columns: ColumnDef[]): Record<string, string> {
   const form: Record<string, string> = {}
   for (const c of columns.filter((x) => x.form !== false)) {
@@ -75,11 +89,42 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
   const tableCols = meta.columns.filter((c) => c.table !== false)
   const formCols = meta.columns.filter((c) => c.form !== false)
 
+  const lookupResource = tableCols.find((c) => c.image?.from)?.image?.from?.resource
+  const lookupRows = list(lookupResource || meta.key)
+  const lookups = useMemo(() => {
+    const maps: Record<string, Map<string, string>> = {}
+    for (const c of tableCols) {
+      const from = c.image?.from
+      if (!from) continue
+      const m = new Map<string, string>()
+      for (const r of lookupRows) {
+        const k = r[from.foreignKey]
+        const v = r[from.field]
+        if (k != null && v) m.set(String(k), String(v))
+      }
+      maps[c.key] = m
+    }
+    return maps
+  }, [tableCols, lookupRows])
+
+  const imageSrc = (row: ResourceRow, c: ColumnDef) => {
+    const own = row[c.key]
+    if (typeof own === 'string' && own) return own
+    const from = c.image?.from
+    if (from) {
+      const hit = lookups[c.key]?.get(String(row[from.localKey] ?? ''))
+      if (hit) return hit
+    }
+    return c.image?.fallback?.(row) ?? ''
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return rows
     return rows.filter((row) =>
-      tableCols.some((c) => cellValue(row, c).toLowerCase().includes(q)),
+      tableCols
+        .filter((c) => c.format !== 'image')
+        .some((c) => cellValue(row, c).toLowerCase().includes(q)),
     )
   }, [rows, query, tableCols])
 
@@ -198,7 +243,9 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
                   <tr key={id || String(row._id)} className="border-t border-[var(--border-main)] align-top">
                     {tableCols.map((c) => (
                       <td key={c.key} className="px-4 py-3 text-[var(--text-main)]">
-                        {c.format === 'badge' ? (
+                        {c.format === 'image' ? (
+                          <Thumb src={imageSrc(row, c)} fallback={c.image?.fallback?.(row) ?? ''} />
+                        ) : c.format === 'badge' ? (
                           <Badge>{cellValue(row, c)}</Badge>
                         ) : (
                           <span className="break-words">{cellValue(row, c)}</span>

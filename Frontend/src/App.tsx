@@ -7,8 +7,10 @@ import { AuthProvider } from './context/AuthContext'
 import { DataProvider } from './context/DataContext'
 import { RESOURCE_META } from './data/resources'
 import { PATH_TO_MODULE } from './lib/wireframe/moduleMap'
+import { AutomationAlerts } from './pages/AutomationAlerts'
 import { Billing } from './pages/Billing'
 import { BuySheet } from './pages/BuySheet'
+import { DemandForecast } from './pages/DemandForecast'
 import { HomeRoute } from './pages/HomeRoute'
 import { IntegrationsHub } from './pages/IntegrationsHub'
 import { Login } from './pages/Login'
@@ -18,6 +20,7 @@ import { ShippingDesk } from './pages/ShippingDesk'
 import { SystemWorkflow } from './pages/SystemWorkflow'
 import { TenantsAdmin } from './pages/TenantsAdmin'
 import { UsersAdmin } from './pages/UsersAdmin'
+import { WarehouseAnalytics } from './pages/WarehouseAnalytics'
 import { WireframeModule } from './pages/WireframeModule'
 
 /** Native React apps (not generic CRUD table, not wireframe host) */
@@ -30,6 +33,9 @@ const NATIVE_PATHS = new Set([
   '/buy-sheet',
   '/users',
   '/workflow',
+  '/forecast',
+  '/alerts',
+  '/warehouse-analytics',
 ])
 
 /** Prefer live Mongo CRUD tables over wireframe for client add/edit/delete */
@@ -109,6 +115,30 @@ export default function App() {
                 element={
                   <RequirePath>
                     <BuySheet />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="forecast"
+                element={
+                  <RequirePath>
+                    <DemandForecast />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="alerts"
+                element={
+                  <RequirePath>
+                    <AutomationAlerts />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="warehouse-analytics"
+                element={
+                  <RequirePath>
+                    <WarehouseAnalytics />
                   </RequirePath>
                 }
               />
