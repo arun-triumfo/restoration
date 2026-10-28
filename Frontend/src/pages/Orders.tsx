@@ -5,6 +5,7 @@ import {
   Package,
   Pencil,
   Plus,
+  Printer,
   RefreshCw,
   Search,
   Trash2,
@@ -388,6 +389,10 @@ export function Orders() {
             <strong>No stock</strong> → status In Process → when ready click <em>Mark ready</em> →
             then Ship to US.
           </li>
+          <li>
+            <strong>Courier label</strong> → click <em>Generate courier label</em> → tracking id
+            assigns on the order → channel notify for Amazon / Shopify.
+          </li>
         </ol>
       </div>
 
@@ -635,6 +640,23 @@ export function Orders() {
                             Receive at US
                           </Button>
                         ) : null}
+                        {(canIndiaAct || canUsAct) && (
+                          <Link
+                            to={`/shipping?orderId=${encodeURIComponent(oid)}`}
+                            className="inline-flex h-8 items-center justify-start gap-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-2.5 text-xs font-semibold text-[var(--text-main)] no-underline hover:bg-[var(--bg-elevated)]"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            {order.awb ? 'View / reprint label' : 'Generate courier label'}
+                          </Link>
+                        )}
+                        {order.awb ? (
+                          <p className="text-[11px] font-mono text-[var(--text-dim)]">
+                            Tracking: {String(order.awb)}
+                            {order.trackingNotifyStatus
+                              ? ` · notify: ${String(order.trackingNotifyStatus)}`
+                              : ''}
+                          </p>
+                        ) : null}
                         <div className="flex flex-wrap gap-1 pt-0.5">
                           <Button
                             variant="ghost"
@@ -851,7 +873,10 @@ export function Orders() {
                 ['Status', viewOrder.status],
                 ['Ship to', viewOrder.shippingAddress],
                 ['Barcode', viewOrder.barcode || '—'],
-                ['AWB', viewOrder.awb || '—'],
+                ['AWB / Tracking', viewOrder.awb || '—'],
+                ['Courier', viewOrder.courier || '—'],
+                ['Tracking status', viewOrder.trackingStatus || '—'],
+                ['Channel notify', viewOrder.trackingNotifyDetail || viewOrder.trackingNotifyStatus || '—'],
                 ['Finance tag', viewOrder.financeTagged ? 'Yes' : 'No'],
                 ['ETA', viewOrder.expectedWarehouseDeliveryDate || '—'],
               ].map(([label, val]) => (

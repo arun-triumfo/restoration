@@ -222,6 +222,28 @@ export const api = {
   shipping: {
     list: () =>
       request<{ success: boolean; count: number; data: ResourceRow[] }>('/shipping'),
+    orderContext: (orderId: string) =>
+      request<{
+        success: boolean
+        data: {
+          orderId: string
+          channel?: string
+          buyerName?: string
+          shippingAddress?: string
+          fromZip: string
+          toZip: string
+          suggestedCarrier: string
+          weightKg: number
+          existingAwb?: string | null
+          parties: {
+            leg: string
+            legLabel: string
+            from: { name: string; zip: string; address: string }
+            to: { name: string; zip: string; address: string }
+            note?: string
+          }
+        }
+      }>(`/shipping/order-context/${encodeURIComponent(orderId)}`),
     rates: (payload: Record<string, unknown>) =>
       request<{
         success: boolean
@@ -231,7 +253,14 @@ export const api = {
         mode?: string
       }>('/shipping/rates', { method: 'POST', body: JSON.stringify(payload) }),
     buyLabel: (payload: Record<string, unknown>) =>
-      request<{ success: boolean; shipment: ResourceRow; message?: string }>('/shipping/labels', {
+      request<{
+        success: boolean
+        shipment: ResourceRow
+        message?: string
+        channelNotify?: { message?: string; status?: string; channel?: string }
+        parties?: { legLabel?: string }
+        order?: ResourceRow
+      }>('/shipping/labels', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),

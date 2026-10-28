@@ -46,6 +46,10 @@ export const sandboxFedEx = {
     toZip = '08817',
     orderId,
     reference,
+    shipFrom,
+    shipTo,
+    buyerName,
+    sku,
   }) {
     const rates = await this.getRates({ weightKg, fromZip, toZip, service })
     const rate = rates[0] || {
@@ -55,16 +59,20 @@ export const sandboxFedEx = {
       ...money(25),
     }
     const awb = `FX${Date.now().toString().slice(-10)}`
-    const labelHtml = `<!DOCTYPE html><html><body style="font-family:monospace;padding:24px">
+    const fromName = shipFrom?.name || 'Ship From'
+    const toName = shipTo?.name || buyerName || 'Consignee'
+    const fromAddr = shipFrom?.address || `ZIP ${fromZip}`
+    const toAddr = shipTo?.address || `ZIP ${toZip}`
+    const labelHtml = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px">
 <h1>FedEx Sandbox Label</h1>
-<p><strong>AWB:</strong> ${awb}</p>
+<p><strong>AWB / Tracking:</strong> ${awb}</p>
 <p><strong>Service:</strong> ${rate.name}</p>
-<p><strong>Order:</strong> ${orderId || reference || '—'}</p>
-<p><strong>From ZIP:</strong> ${fromZip} → <strong>To ZIP:</strong> ${toZip}</p>
-<p><strong>Weight:</strong> ${weightKg} kg</p>
-<p><strong>Charge:</strong> ${rate.currency} ${rate.amount}</p>
+<p><strong>Order:</strong> ${orderId || reference || '—'} ${sku ? `· SKU ${sku}` : ''}</p>
+<p><strong>FROM — ${fromName}</strong><br/>${fromAddr}<br/>ZIP ${shipFrom?.zip || fromZip}</p>
+<p><strong>TO — ${toName}</strong><br/>${toAddr}<br/>ZIP ${shipTo?.zip || toZip}</p>
+<p><strong>Weight:</strong> ${weightKg} kg · <strong>Charge:</strong> ${rate.currency} ${rate.amount}</p>
 <svg width="220" height="60"><rect width="220" height="60" fill="#000"/><text x="20" y="38" fill="#fff" font-size="18">${awb}</text></svg>
-<p style="color:#666;font-size:12px">Sandbox only — not a real carrier label</p>
+<p style="color:#666;font-size:12px">Sandbox only — not a real carrier label. Tracking id is assigned to the order for channel notify.</p>
 </body></html>`
 
     return {

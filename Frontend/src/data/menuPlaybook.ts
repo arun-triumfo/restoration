@@ -193,15 +193,17 @@ export const MENU_PLAYBOOK: MenuPlaybookItem[] = [
     section: '4 · Move & ship',
     path: '/shipping',
     label: 'Shipping Desk',
-    purpose: 'Rates, label, track. Live when courier keys are on Integrations.',
+    purpose:
+      'Courier label + tracking assign on the order + channel notify (Amazon/Shopify). From/To = India WH, US WH, or customer.',
     who: 'India WH, USA WH',
     steps: [
-      'Open Shipping Desk.',
-      'Choose carrier (Aramex / Shiprocket / …).',
-      'Get rates → Buy label.',
-      'Track AWB.',
+      'From Orders click Generate courier label, or pick order here.',
+      'Confirm leg (India→US or US→Customer).',
+      'Get rates → Generate label & assign tracking.',
+      'AWB saves on the order; notify status logged for the sales channel.',
+      'Track AWB anytime.',
     ],
-    crud: 'Create shipment / track',
+    crud: 'Create shipment / assign tracking / track',
   },
   {
     step: 15,
