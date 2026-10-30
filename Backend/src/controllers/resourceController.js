@@ -113,13 +113,18 @@ export function createResource(resource) {
         payload = await routeNewOrderPayload(payload, tenantIdOf(req))
       }
 
-      // Returns always land with US Warehouse Manager
+      // Scenario D: all returns land with India Warehouse Manager
       if (resource === 'returns') {
         payload = {
           ...payload,
-          queueOwner: 'usa_wh',
+          queueOwner: 'india_wh',
           status: payload.status || 'Pending Inspection',
-          history: pushHistory(payload, 'Return opened', 'Routed to US Warehouse Manager for condition / restock'),
+          accountsTagged: true,
+          history: pushHistory(
+            payload,
+            'Return opened',
+            'Routed to India Warehouse Manager. Generate platform return label (Amazon/Shopify/…) and send PDF to customer.',
+          ),
         }
       }
 

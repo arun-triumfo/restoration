@@ -291,16 +291,39 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ orderIds }) },
       ),
     generateBarcode: (orderId: string) =>
-      request<{ success: boolean; data: ResourceRow; message?: string }>(
-        '/orders/actions/generate-barcode',
-        { method: 'POST', body: JSON.stringify({ orderId }) },
-      ),
+      request<{
+        success: boolean
+        data: ResourceRow
+        message?: string
+        label?: ResourceRow
+      }>('/orders/actions/send-courier-label-to-us', {
+        method: 'POST',
+        body: JSON.stringify({ orderId }),
+      }),
+    sendCourierLabelToUs: (orderId: string) =>
+      request<{
+        success: boolean
+        data: ResourceRow
+        message?: string
+        label?: ResourceRow
+      }>('/orders/actions/send-courier-label-to-us', {
+        method: 'POST',
+        body: JSON.stringify({ orderId }),
+      }),
     shipIndiaToUs: (
       orderId: string,
-      extras?: { weightKg: number; shipPrice: number; photoDataUrl?: string },
+      extras?: {
+        weightKg: number
+        shipPrice: number
+        photoDataUrl?: string
+        lengthCm?: number
+        widthCm?: number
+        heightCm?: number
+        dimWeightKg?: number
+      },
     ) =>
       request<{ success: boolean; data: ResourceRow; message?: string; nextStep?: string }>(
-        '/orders/actions/ship-india-to-us',
+        '/orders/actions/ship-india-to-customer',
         {
           method: 'POST',
           body: JSON.stringify({
@@ -308,7 +331,52 @@ export const api = {
             weightKg: extras?.weightKg,
             shipPrice: extras?.shipPrice,
             photoDataUrl: extras?.photoDataUrl,
+            lengthCm: extras?.lengthCm,
+            widthCm: extras?.widthCm,
+            heightCm: extras?.heightCm,
+            dimWeightKg: extras?.dimWeightKg,
           }),
+        },
+      ),
+    shipIndiaToCustomer: (
+      orderId: string,
+      extras?: {
+        weightKg: number
+        shipPrice: number
+        photoDataUrl?: string
+        lengthCm?: number
+        widthCm?: number
+        heightCm?: number
+        dimWeightKg?: number
+      },
+    ) =>
+      request<{ success: boolean; data: ResourceRow; message?: string; nextStep?: string }>(
+        '/orders/actions/ship-india-to-customer',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId,
+            ...extras,
+          }),
+        },
+      ),
+    dispatchIndiaToCustomer: (
+      orderId: string,
+      extras?: {
+        weightKg: number
+        shipPrice?: number
+        photoDataUrl?: string
+        lengthCm?: number
+        widthCm?: number
+        heightCm?: number
+        dimWeightKg?: number
+      },
+    ) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/orders/actions/dispatch-india-to-customer',
+        {
+          method: 'POST',
+          body: JSON.stringify({ orderId, ...extras }),
         },
       ),
     usReceive: (orderId: string) =>
@@ -320,6 +388,14 @@ export const api = {
       request<{ success: boolean; data: ResourceRow; message?: string }>(
         '/orders/actions/production-complete',
         { method: 'POST', body: JSON.stringify({ orderId }) },
+      ),
+  },
+
+  returnsApi: {
+    buyReturnLabel: (returnId: string) =>
+      request<{ success: boolean; data: ResourceRow; message?: string; label?: ResourceRow }>(
+        '/returns/actions/buy-return-label',
+        { method: 'POST', body: JSON.stringify({ returnId }) },
       ),
   },
 

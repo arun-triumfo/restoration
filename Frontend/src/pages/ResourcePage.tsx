@@ -1,13 +1,14 @@
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Printer, Search, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { api, type ResourceRow } from '../api/client'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Pagination } from '../components/ui/Pagination'
+import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import type { ColumnDef, ResourceMeta } from '../data/resources'
-import type { ResourceRow } from '../api/client'
 
 function cellValue(row: ResourceRow, col: ColumnDef): string {
   const raw = row[col.key]
@@ -71,7 +72,8 @@ function formToPayload(
 
 export function ResourcePage({ meta }: { meta: ResourceMeta }) {
   const { user } = useAuth()
-  const { list, create, update, remove, getId, loading, error } = useData()
+  const { pushToast } = useApp()
+  const { list, create, update, remove, getId, loading, error, refresh } = useData()
   const rows = list(meta.key)
   const canWrite =
     user?.roleCode === 'super_admin' ||
@@ -85,6 +87,7 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
   const [form, setForm] = useState<Record<string, string>>(() => emptyForm(meta.columns))
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [labelBusy, setLabelBusy] = useState<string | null>(null)
 
   const tableCols = meta.columns.filter((c) => c.table !== false)
   const formCols = meta.columns.filter((c) => c.form !== false)
@@ -254,18 +257,68 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
                     ))}
                     <td className="px-4 py-3">
                       {canWrite ? (
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" aria-label="Edit" onClick={() => openEdit(row)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Delete"
-                            onClick={() => setDeleteId(id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                          </Button>
+                        <div className="flex flex-col gap-1">
+                          {meta.key === 'returns' ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="justify-start"
+                              disabled={!!labelBusy}
+                              onClick={async () => {
+                                try {
+                                  setLabelBusy(id)
+                                  const res = await api.returnsApi.buyReturnLabel(id)
+                                  pushToast(res.message || 'Return label created', 'success')
+                                  await refresh()
+                                  const pdf = res.label?.labelPdfUrl || res.data?.returnLabelPdfUrl
+                                  if (pdf) {
+                                    const base = api.base.replace(/\/api\/?$/, '')
+                                    window.open(
+                                      String(pdf).startsWith('http') ? String(pdf) : `${base}${pdf}`,
+                                      '_blank',
+                                    )
+                                  }
+                                } catch (err) {
+                                  pushToast(
+                                    err instanceof Error ? err.message : 'Return label failed',
+                                    'error',
+                                  )
+                                } finally {
+                                  setLabelBusy(null)
+                                }
+                              }}
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              {labelBusy === id ? 'Label…' : 'Buy return label (PDF)'}
+                            </Button>
+                          ) : null}
+                          {meta.key === 'returns' && row.returnLabelPdfUrl ? (
+                            <a
+                              href={
+                                String(row.returnLabelPdfUrl).startsWith('http')
+                                  ? String(row.returnLabelPdfUrl)
+                                  : `${api.base.replace(/\/api\/?$/, '')}${String(row.returnLabelPdfUrl)}`
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] font-semibold text-indigo-600 hover:underline"
+                            >
+                              Open label PDF
+                            </a>
+                          ) : null}
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" aria-label="Edit" onClick={() => openEdit(row)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              aria-label="Delete"
+                              onClick={() => setDeleteId(id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <span className="text-[11px] text-[var(--text-dim)]">View</span>

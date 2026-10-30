@@ -220,10 +220,16 @@ export const MENU_PLAYBOOK: MenuPlaybookItem[] = [
     section: '5 · Returns & finance',
     path: '/returns',
     label: 'Returns & Claims',
-    purpose: 'Customer returns land with the US Warehouse Manager.',
-    who: 'US WH Manager, Finance',
-    steps: ['Open Returns.', 'Add return id, order, customer, RMA.', 'Grade, restock, or mark for inspection.'],
-    crud: 'Add / Edit / Delete',
+    purpose:
+      'All returns land with India Warehouse Manager. Buy Amazon/Shopify (platform) return label PDF, send to customer; cost hits Accounts / Profitability.',
+    who: 'India WH Manager, Finance',
+    steps: [
+      'Open Returns (India WH).',
+      'Add return id, order, customer, SKU / product.',
+      'Click Buy return label (PDF) — platform label for the sales channel.',
+      'Send PDF to customer; review P&L impact on Profitability.',
+    ],
+    crud: 'Add / Edit / Delete / Buy return label',
   },
   {
     step: 17,

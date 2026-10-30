@@ -29,11 +29,15 @@ import resourceRoutes from './routes/resources.js'
 import shippingRoutes from './routes/shipping.js'
 import {
   bulkReRoute,
+  dispatchIndiaToCustomer,
   generateBarcode,
   productionComplete,
+  sendCourierLabelToUs,
+  shipIndiaToCustomer,
   shipIndiaToUs,
   usReceive,
 } from './controllers/fulfillmentController.js'
+import { buyReturnLabel } from './controllers/returnsController.js'
 import { RESOURCES } from './resources.js'
 
 dotenv.config()
@@ -140,11 +144,32 @@ app.post(
   generateBarcode,
 )
 app.post(
+  '/api/orders/actions/send-courier-label-to-us',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  sendCourierLabelToUs,
+)
+app.post(
   '/api/orders/actions/ship-india-to-us',
   authenticate,
   requireActiveBilling,
   requirePermission('orders', 'write'),
   shipIndiaToUs,
+)
+app.post(
+  '/api/orders/actions/ship-india-to-customer',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  shipIndiaToCustomer,
+)
+app.post(
+  '/api/orders/actions/dispatch-india-to-customer',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('orders', 'write'),
+  dispatchIndiaToCustomer,
 )
 app.post(
   '/api/orders/actions/us-receive',
@@ -159,6 +184,13 @@ app.post(
   requireActiveBilling,
   requirePermission('orders', 'write'),
   productionComplete,
+)
+app.post(
+  '/api/returns/actions/buy-return-label',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('returns', 'write'),
+  buyReturnLabel,
 )
 
 app.use('/api/resources', authenticate, requireActiveBilling, resourceRoutes)

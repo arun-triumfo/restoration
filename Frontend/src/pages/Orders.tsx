@@ -92,45 +92,69 @@ function pendingRank(st: string) {
   return 5
 }
 
-/** Where the rug is right now — only India WH / US WH / transit / make */
+/** Where the rug is right now — India WH / US WH / direct-to-customer / make */
 function locationInfo(order: ResourceRow) {
   const st = String(order.status || '')
   const sc = String(order.fulfillmentScenario || '')
   const q = String(order.queueOwner || 'india_wh')
   const stockAt = String(order.stockAt || '')
 
-  if (st === 'In Transit' || stockAt === 'In transit') {
+  if (order.dispatchedDirectToCustomer || stockAt.includes('customer')) {
     return {
-      wh: 'In transit',
-      detail: 'Moving India Warehouse → US Warehouse',
+      wh: 'In transit → customer',
+      detail: 'India shipped direct to US customer (not via US Warehouse)',
       tone: 'warning' as const,
       step: order.awb
-        ? 'US manager: click Receive when it arrives'
-        : 'Next: Generate courier label (tracking id)',
+        ? `Track ${String(order.awb)} from India WH`
+        : 'Tracking should be on the order',
     }
   }
-  if (st === 'In Process' || sc === 'MAKE') {
+  if (st === 'In Transit' && !order.dispatchedDirectToCustomer) {
+    return {
+      wh: 'In transit',
+      detail: stockAt || 'In transit',
+      tone: 'warning' as const,
+      step: 'Track shipment from India WH',
+    }
+  }
+  if (st === 'In Process' || (sc === 'MAKE' && st === 'In Process')) {
     return {
       wh: 'Not in stock',
       detail: 'Making at India side — not in either warehouse yet',
       tone: 'purple' as const,
-      step: 'When ready: Mark ready → then Ship to US',
+      step: 'When ready: Mark ready → then ship direct to customer',
     }
   }
-  if (q === 'usa_wh' || stockAt === 'US Warehouse' || (sc === 'US_STOCK' && order.barcodeGenerated)) {
+  if (
+    q === 'usa_wh' ||
+    stockAt === 'US Warehouse' ||
+    (sc === 'US_STOCK' && (order.labelSentToUs || order.barcodeGenerated))
+  ) {
     return {
       wh: 'US Warehouse',
-      detail: 'Stock / order is with the US Warehouse',
+      detail: order.labelPdfUrl
+        ? 'Courier label PDF with US — pack & send to customer'
+        : 'Stock / order is with the US Warehouse',
       tone: 'success' as const,
-      step: 'US: Pack & dispatch to customer',
+      step: 'US: Pack & send (label already from India)',
     }
   }
   if (sc === 'US_STOCK') {
     return {
-      wh: 'US Warehouse',
-      detail: 'US has stock — waiting for India to send barcode',
+      wh: 'US Warehouse (stock)',
+      detail: 'US has stock — India must buy platform label & send PDF to US',
       tone: 'success' as const,
-      step: 'Step 1: Send barcode to US',
+      step: 'Step 1: Send courier label to US',
+    }
+  }
+  if (st === 'Label Created' || st === 'Ready to Label' || order.labelGenerated) {
+    return {
+      wh: 'India Warehouse',
+      detail: 'Label ready — print PDF, pack, then dispatch to customer',
+      tone: 'purple' as const,
+      step: order.awb
+        ? 'Pack → then Dispatch to customer (dim wt + pics)'
+        : 'Generate courier label first',
     }
   }
   return {
@@ -139,8 +163,8 @@ function locationInfo(order: ResourceRow) {
     tone: 'purple' as const,
     step:
       sc === 'INDIA_SHIP'
-        ? 'Step 1: Add weight + photo → Ship to US'
-        : 'Follow the green button on the right',
+        ? 'Weight + bill → courier label → pack → dispatch to customer'
+        : 'Follow the primary button on the right',
   }
 }
 
@@ -191,8 +215,12 @@ export function Orders() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [viewOrder, setViewOrder] = useState<ResourceRow | null>(null)
   const [shipOrder, setShipOrder] = useState<ResourceRow | null>(null)
+  const [dispatchOrder, setDispatchOrder] = useState<ResourceRow | null>(null)
   const [shipWeight, setShipWeight] = useState('5')
   const [shipPrice, setShipPrice] = useState('')
+  const [shipLen, setShipLen] = useState('')
+  const [shipWid, setShipWid] = useState('')
+  const [shipHt, setShipHt] = useState('')
   const [shipPhoto, setShipPhoto] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
@@ -201,12 +229,18 @@ export function Orders() {
 
   const roleScoped = useMemo(() => {
     if (role === 'super_admin' || role === 'finance') return orders
+    // US only packs/sends orders in their bucket (Scenario A after label PDF)
     if (role === 'usa_wh') return orders.filter(inUsQueue)
+    // India is the hub: own queue + track labels sent to US + direct-to-customer ships
     return orders.filter(
       (o) =>
         inIndiaQueue(o) ||
+        Boolean(o.labelSentToUs) ||
+        Boolean(o.barcodeGenerated) ||
+        Boolean(o.dispatchedDirectToCustomer) ||
+        Boolean(o.awb) ||
         String(o.status || '').toLowerCase().includes('in process') ||
-        String(o.fulfillmentScenario || '') === 'MAKE',
+        ['INDIA_SHIP', 'MAKE', 'US_STOCK'].includes(String(o.fulfillmentScenario || '')),
     )
   }, [orders, role])
 
@@ -381,17 +415,21 @@ export function Orders() {
       </div>
 
       <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
-        <p className="font-bold">Easy test — only press the primary button shown on each order</p>
+        <p className="font-bold">Client SOP — press the primary button on each order</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[13px] text-indigo-900/90 dark:text-indigo-100/90">
           <li>
-            <strong>US stock</strong> → Send barcode to US → US login → Pack → Generate courier label.
+            <strong>A · US stock</strong> → Send courier label to US (Amazon/Shopify platform label +
+            PDF) → US packs &amp; sends. India keeps history &amp; tracks.
           </li>
           <li>
-            <strong>India stock</strong> → Ship to US (weight + photo + price) → Generate courier
-            label → US Receive → Pack.
+            <strong>B · India stock</strong> → Weight + bill → Generate courier label (direct to
+            customer) → Pack → Dispatch (dim weight + pics). Not via US Warehouse.
           </li>
           <li>
-            <strong>No stock</strong> → Mark ready → then same as India stock.
+            <strong>C · No stock</strong> → Mark ready → then same as B.
+          </li>
+          <li>
+            <strong>D · Returns</strong> → India WH Returns menu → Buy return label PDF (platform).
           </li>
         </ol>
       </div>
@@ -500,12 +538,22 @@ export function Orders() {
                   canIndiaAct &&
                   (scenario === 'US_STOCK' ||
                     String(order.stockAllocation || '').toLowerCase().includes('us stock')) &&
+                  !order.labelSentToUs &&
                   !order.barcodeGenerated
-                const showShip =
+                const showShipPrep =
                   canIndiaAct &&
-                  (scenario === 'INDIA_SHIP' || (scenario === 'MAKE' && st !== 'In Process'))
+                  (scenario === 'INDIA_SHIP' || (scenario === 'MAKE' && st !== 'In Process')) &&
+                  !order.dispatchedDirectToCustomer &&
+                  st !== 'In Transit'
+                const showDispatch =
+                  canIndiaAct &&
+                  (scenario === 'INDIA_SHIP' || scenario === 'MAKE') &&
+                  Boolean(order.awb || order.labelGenerated) &&
+                  !order.dispatchedDirectToCustomer &&
+                  st.includes('Packed')
                 const showMake = canIndiaAct && st === 'In Process'
-                const showReceive = canUsAct && st === 'In Transit'
+                const showReceive =
+                  canUsAct && st === 'In Transit' && !order.dispatchedDirectToCustomer && scenario !== 'INDIA_SHIP'
 
                 return (
                   <tr key={oid} className="border-t border-[var(--border-main)] align-top">
@@ -589,14 +637,16 @@ export function Orders() {
                             className="justify-start"
                             disabled={!!busyAction}
                             onClick={() =>
-                              runAction(`bc-${oid}`, () => api.fulfillment.generateBarcode(oid))
+                              runAction(`bc-${oid}`, () =>
+                                api.fulfillment.sendCourierLabelToUs(oid),
+                              )
                             }
                           >
                             <Zap className="h-3.5 w-3.5" />
-                            Send barcode to US
+                            Send courier label to US
                           </Button>
                         ) : null}
-                        {showShip ? (
+                        {showShipPrep ? (
                           <Button
                             variant="secondary"
                             size="sm"
@@ -612,11 +662,14 @@ export function Orders() {
                                     ? String(order.shippingCostAct)
                                     : '',
                               )
+                              setShipLen(order.shipLengthCm != null ? String(order.shipLengthCm) : '')
+                              setShipWid(order.shipWidthCm != null ? String(order.shipWidthCm) : '')
+                              setShipHt(order.shipHeightCm != null ? String(order.shipHeightCm) : '')
                               setShipPhoto(null)
                             }}
                           >
                             <Truck className="h-3.5 w-3.5" />
-                            Ship to US (weight + photo + price)
+                            Prep ship to customer (weight + bill)
                           </Button>
                         ) : null}
                         {showMake ? (
@@ -635,6 +688,32 @@ export function Orders() {
                             Mark ready (made)
                           </Button>
                         ) : null}
+                        {showDispatch ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="justify-start"
+                            disabled={!!busyAction}
+                            onClick={() => {
+                              setDispatchOrder(order)
+                              setShipWeight(String(order.shipWeightKg || '5'))
+                              setShipPrice(
+                                order.shipPrice != null
+                                  ? String(order.shipPrice)
+                                  : order.shippingCostAct != null
+                                    ? String(order.shippingCostAct)
+                                    : '0',
+                              )
+                              setShipLen(order.shipLengthCm != null ? String(order.shipLengthCm) : '')
+                              setShipWid(order.shipWidthCm != null ? String(order.shipWidthCm) : '')
+                              setShipHt(order.shipHeightCm != null ? String(order.shipHeightCm) : '')
+                              setShipPhoto(null)
+                            }}
+                          >
+                            <Truck className="h-3.5 w-3.5" />
+                            Dispatch to customer
+                          </Button>
+                        ) : null}
                         {showReceive ? (
                           <Button
                             variant="primary"
@@ -649,7 +728,7 @@ export function Orders() {
                             Receive at US
                           </Button>
                         ) : null}
-                        {(canIndiaAct || canUsAct) && (
+                        {(canIndiaAct || canUsAct) && scenario !== 'US_STOCK' && (
                           <Link
                             to={`/shipping?orderId=${encodeURIComponent(oid)}`}
                             className="inline-flex h-8 items-center justify-start gap-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-2.5 text-xs font-semibold text-[var(--text-main)] no-underline hover:bg-[var(--bg-elevated)]"
@@ -658,9 +737,27 @@ export function Orders() {
                             {order.awb ? 'View / reprint label' : 'Generate courier label'}
                           </Link>
                         )}
+                        {order.labelPdfUrl ? (
+                          <a
+                            href={
+                              String(order.labelPdfUrl).startsWith('http')
+                                ? String(order.labelPdfUrl)
+                                : `${api.base.replace(/\/api\/?$/, '')}${String(order.labelPdfUrl)}`
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-8 items-center justify-start gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-900 no-underline hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Open label PDF
+                          </a>
+                        ) : null}
                         {order.awb ? (
                           <p className="text-[11px] font-mono text-[var(--text-dim)]">
                             Tracking: {String(order.awb)}
+                            {order.platformLabelSource
+                              ? ` · ${String(order.platformLabelSource)}`
+                              : ''}
                             {order.trackingNotifyStatus
                               ? ` · notify: ${String(order.trackingNotifyStatus)}`
                               : ''}
@@ -899,18 +996,42 @@ export function Orders() {
             {(viewOrder.shipWeightKg || viewOrder.shipPhotoUrl || viewOrder.shipPrice != null) && (
               <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] p-3">
                 <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">
-                  India → US package
+                  Shipping audit / package
                 </p>
                 <p className="mt-1 text-sm">
                   Weight: <strong>{String(viewOrder.shipWeightKg || '—')} kg</strong>
                   {' · '}
-                  Price charged:{' '}
+                  Dim:{' '}
+                  <strong>{String(viewOrder.dimWeightKg || '—')} kg</strong>
+                  {' · '}
+                  Bill:{' '}
                   <strong>
                     {viewOrder.shipPrice != null || viewOrder.shippingCostAct != null
                       ? Number(viewOrder.shipPrice ?? viewOrder.shippingCostAct).toFixed(2)
                       : '—'}
                   </strong>
                 </p>
+                {(viewOrder.shipLengthCm || viewOrder.shipWidthCm || viewOrder.shipHeightCm) && (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    L×W×H: {String(viewOrder.shipLengthCm || '—')} ×{' '}
+                    {String(viewOrder.shipWidthCm || '—')} × {String(viewOrder.shipHeightCm || '—')}{' '}
+                    cm
+                  </p>
+                )}
+                {viewOrder.labelPdfUrl ? (
+                  <a
+                    className="mt-2 inline-block text-xs font-semibold text-indigo-600 hover:underline"
+                    href={
+                      String(viewOrder.labelPdfUrl).startsWith('http')
+                        ? String(viewOrder.labelPdfUrl)
+                        : `${api.base.replace(/\/api\/?$/, '')}${String(viewOrder.labelPdfUrl)}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open courier label PDF
+                  </a>
+                ) : null}
                 {viewOrder.shipPhotoUrl ? (
                   <img
                     src={
@@ -952,8 +1073,8 @@ export function Orders() {
 
       <Modal
         open={!!shipOrder}
-        title={shipOrder ? `Ship ${String(shipOrder.orderId)} to US` : 'Ship to US'}
-        badge="India → US"
+        title={shipOrder ? `Prep ${String(shipOrder.orderId)} → customer` : 'Ship to customer'}
+        badge="India → Customer"
         size="lg"
         onClose={() => {
           shipStreamRef.current?.getTracks().forEach((t) => t.stop())
@@ -979,9 +1100,12 @@ export function Orders() {
                 if (!shipOrder) return
                 const oid = String(shipOrder.orderId)
                 await runAction(`ship-${oid}`, () =>
-                  api.fulfillment.shipIndiaToUs(oid, {
+                  api.fulfillment.shipIndiaToCustomer(oid, {
                     weightKg: Number(shipWeight),
                     shipPrice: Number(shipPrice),
+                    lengthCm: shipLen ? Number(shipLen) : undefined,
+                    widthCm: shipWid ? Number(shipWid) : undefined,
+                    heightCm: shipHt ? Number(shipHt) : undefined,
                     photoDataUrl: shipPhoto || undefined,
                   }),
                 )
@@ -992,16 +1116,16 @@ export function Orders() {
                 navigate(`/shipping?orderId=${encodeURIComponent(oid)}`)
               }}
             >
-              <Truck className="h-3.5 w-3.5" /> Save & open courier label
+              <Truck className="h-3.5 w-3.5" /> Save bill & open courier label
             </Button>
           </>
         }
       >
         <div className="space-y-3 text-sm">
           <p className="text-[var(--text-muted)]">
-            Before the courier label: enter package <strong>weight</strong>, the{' '}
-            <strong>price charged now</strong>, and a <strong>photo</strong> (recommended). Then
-            create tracking on Shipping Desk.
+            India ships <strong>direct to the US customer</strong> (not to US Warehouse). Save{' '}
+            <strong>weight</strong>, courier <strong>rate / total bill</strong> (for shipping audit),
+            optional dims, then buy the courier label with customer address.
           </p>
           <label className="block text-xs font-semibold text-[var(--text-main)]">
             Package weight (kg) *
@@ -1015,17 +1139,49 @@ export function Orders() {
             />
           </label>
           <label className="block text-xs font-semibold text-[var(--text-main)]">
-            Price charged at weigh-time *
+            Courier rate / total bill *
             <input
               type="number"
               min="0"
               step="0.01"
               value={shipPrice}
               onChange={(e) => setShipPrice(e.target.value)}
-              placeholder="Amount charged / quoted now"
+              placeholder="Quoted rate saved for shipping audit"
               className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
             />
           </label>
+          <div className="grid grid-cols-3 gap-2">
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              L (cm)
+              <input
+                type="number"
+                min="0"
+                value={shipLen}
+                onChange={(e) => setShipLen(e.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              W (cm)
+              <input
+                type="number"
+                min="0"
+                value={shipWid}
+                onChange={(e) => setShipWid(e.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              H (cm)
+              <input
+                type="number"
+                min="0"
+                value={shipHt}
+                onChange={(e) => setShipHt(e.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              />
+            </label>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -1043,7 +1199,7 @@ export function Orders() {
                     await shipVideoRef.current.play()
                   }
                 } catch {
-                  pushToast('Camera not available — you can still ship with weight only', 'info')
+                  pushToast('Camera not available — you can still continue with weight only', 'info')
                 }
               }}
             >
@@ -1095,6 +1251,179 @@ export function Orders() {
               alt="Package"
               className="h-32 rounded-lg border object-cover"
             />
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!dispatchOrder}
+        title={
+          dispatchOrder
+            ? `Dispatch ${String(dispatchOrder.orderId)} to customer`
+            : 'Dispatch to customer'
+        }
+        badge="Dim weight + pics"
+        size="lg"
+        onClose={() => {
+          shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+          setDispatchOrder(null)
+          setShipPhoto(null)
+        }}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+                setDispatchOrder(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!!busyAction || !Number(shipWeight)}
+              onClick={async () => {
+                if (!dispatchOrder) return
+                const oid = String(dispatchOrder.orderId)
+                await runAction(`disp-${oid}`, () =>
+                  api.fulfillment.dispatchIndiaToCustomer(oid, {
+                    weightKg: Number(shipWeight),
+                    shipPrice: shipPrice === '' ? undefined : Number(shipPrice),
+                    lengthCm: shipLen ? Number(shipLen) : undefined,
+                    widthCm: shipWid ? Number(shipWid) : undefined,
+                    heightCm: shipHt ? Number(shipHt) : undefined,
+                    photoDataUrl: shipPhoto || undefined,
+                  }),
+                )
+                shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+                setDispatchOrder(null)
+                setShipPhoto(null)
+              }}
+            >
+              <Truck className="h-3.5 w-3.5" /> Confirm dispatch
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm">
+          <p className="text-[var(--text-muted)]">
+            After pack: record <strong>dimensional weight</strong> and <strong>photos</strong> for
+            shipping audit, then mark dispatched. Rug goes straight to the customer.
+          </p>
+          {dispatchOrder?.awb ? (
+            <p className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 py-2 font-mono text-xs">
+              Tracking: {String(dispatchOrder.awb)}
+            </p>
+          ) : null}
+          <label className="block text-xs font-semibold text-[var(--text-main)]">
+            Actual weight (kg) *
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={shipWeight}
+              onChange={(e) => setShipWeight(e.target.value)}
+              className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              L (cm)
+              <input
+                type="number"
+                min="0"
+                value={shipLen}
+                onChange={(e) => setShipLen(e.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              W (cm)
+              <input
+                type="number"
+                min="0"
+                value={shipWid}
+                onChange={(e) => setShipWid(e.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              H (cm)
+              <input
+                type="number"
+                min="0"
+                value={shipHt}
+                onChange={(e) => setShipHt(e.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false,
+                  })
+                  shipStreamRef.current = stream
+                  if (shipVideoRef.current) {
+                    shipVideoRef.current.srcObject = stream
+                    await shipVideoRef.current.play()
+                  }
+                } catch {
+                  pushToast('Camera not available', 'info')
+                }
+              }}
+            >
+              <Camera className="h-3.5 w-3.5" /> Open camera
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const video = shipVideoRef.current
+                if (!video) return
+                const canvas = document.createElement('canvas')
+                canvas.width = video.videoWidth || 640
+                canvas.height = video.videoHeight || 480
+                const ctx = canvas.getContext('2d')
+                if (!ctx) return
+                ctx.drawImage(video, 0, 0)
+                setShipPhoto(canvas.toDataURL('image/jpeg', 0.7))
+              }}
+            >
+              Snap photo
+            </Button>
+            <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-main)] px-2.5 text-xs font-semibold">
+              Upload photo
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => setShipPhoto(String(reader.result || ''))
+                  reader.readAsDataURL(file)
+                }}
+              />
+            </label>
+          </div>
+          <video
+            ref={shipVideoRef}
+            muted
+            playsInline
+            className="max-h-48 w-full rounded-lg border border-[var(--border-main)] bg-black object-contain"
+          />
+          {shipPhoto ? (
+            <img src={shipPhoto} alt="Dispatch" className="h-32 rounded-lg border object-cover" />
           ) : null}
         </div>
       </Modal>

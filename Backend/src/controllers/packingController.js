@@ -3,6 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
 import { getResourceModel } from '../models/createResourceModel.js'
+import { pushHistory } from '../services/orderFulfillment.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PHOTOS_DIR = path.resolve(__dirname, '../../uploads/packing')
@@ -84,9 +85,11 @@ export async function confirmPack(req, res) {
     }
     await Packing().create(event)
 
-    const role = req.user?.roleCode
-    const nextStatus =
-      role === 'usa_wh' || order.queueOwner === 'usa_wh' ? 'Packed & Handover' : 'Packed & Handover'
+    const nextStatus = 'Packed & Handover'
+    const nextStep =
+      order.fulfillmentScenario === 'INDIA_SHIP' || order.queueOwner === 'india_wh'
+        ? 'Packed at India — next: Dispatch to customer (dim weight + pics)'
+        : 'Packed at US — send to customer with platform / courier label'
     const updated = await Orders()
       .findOneAndUpdate(
         { orderId, tenantId: tid },
@@ -97,7 +100,8 @@ export async function confirmPack(req, res) {
             packedAt: event.packedAt,
             packedBy: event.packedBy,
             packingScanSku: scannedSku,
-            stockAllocation: 'Packed',
+            stockAllocation: nextStep,
+            history: pushHistory(order, 'Packed', nextStep),
           },
         },
         { new: true },
