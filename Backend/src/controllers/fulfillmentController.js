@@ -126,7 +126,7 @@ export async function generateBarcode(req, res) {
   }
 }
 
-/** POST /api/orders/actions/ship-india-to-us  body: { orderId } */
+/** POST /api/orders/actions/ship-india-to-us  body: { orderId, weightKg, photoDataUrl? } */
 export async function shipIndiaToUs(req, res) {
   try {
     const tid = tenantIdOf(req)
@@ -153,14 +153,38 @@ export async function shipIndiaToUs(req, res) {
       })
     }
 
-    const result = applyShipIndiaToUs(order)
+    let photoUrl = null
+    const photoDataUrl = req.body?.photoDataUrl
+    if (photoDataUrl && String(photoDataUrl).startsWith('data:image')) {
+      const fs = await import('fs')
+      const path = await import('path')
+      const { fileURLToPath } = await import('url')
+      const __dirname = path.dirname(fileURLToPath(import.meta.url))
+      const dir = path.resolve(__dirname, '../../uploads/shipping-photos')
+      fs.mkdirSync(dir, { recursive: true })
+      const match = String(photoDataUrl).match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/)
+      if (match) {
+        const ext = match[1].includes('png') ? 'png' : 'jpg'
+        const fileName = `ship-${orderId}-${Date.now()}.${ext}`
+        fs.writeFileSync(path.join(dir, fileName), Buffer.from(match[2], 'base64'))
+        photoUrl = `/uploads/shipping-photos/${fileName}`
+      }
+    }
+
+    const result = applyShipIndiaToUs(order, {
+      weightKg: req.body?.weightKg,
+      shipPrice: req.body?.shipPrice,
+      photoUrl,
+    })
     if (result.error) return res.status(409).json({ success: false, message: result.error })
 
     const data = await patchOrder(orderId, tid, result.patch)
     res.json({
       success: true,
       data,
-      message: 'India→US shipment started (barcode / compliance recorded)',
+      message:
+        'India→US ready: weight, price, and photo saved. Next open Generate courier label to create tracking.',
+      nextStep: 'shipping_label',
     })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })

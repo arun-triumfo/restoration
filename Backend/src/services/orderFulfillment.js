@@ -188,11 +188,22 @@ export function applyBarcodeAndSendToUs(order) {
   }
 }
 
-/** India: start / confirm ship India → US (B1) */
-export function applyShipIndiaToUs(order) {
+/** India: start / confirm ship India → US (B1) — requires weight + optional photo */
+export function applyShipIndiaToUs(order, extras = {}) {
   if (order.fulfillmentScenario === SCENARIO.MAKE && order.status === 'In Process') {
     return { error: 'Order still In Process — wait for manufacturing / ETA before shipping to US' }
   }
+  const weightKg = Number(extras.weightKg)
+  if (!weightKg || weightKg <= 0) {
+    return { error: 'Package weight (kg) is required before shipping India → US' }
+  }
+  const shipPrice = Number(extras.shipPrice)
+  if (!Number.isFinite(shipPrice) || shipPrice < 0) {
+    return { error: 'Courier price charged at weigh-time is required (use 0 if not billed yet)' }
+  }
+  const barcode =
+    order.barcode ||
+    `BC-${String(order.sku || 'SKU').replace(/\s+/g, '').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
   return {
     patch: {
       queueOwner: 'india_wh',
@@ -202,13 +213,15 @@ export function applyShipIndiaToUs(order) {
       stockAllocation: 'In transit to US Warehouse',
       fulfillmentScenario: order.fulfillmentScenario || SCENARIO.INDIA_SHIP,
       barcodeGenerated: true,
-      barcode:
-        order.barcode ||
-        `BC-${String(order.sku || 'SKU').replace(/\s+/g, '').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
+      barcode,
+      shipWeightKg: weightKg,
+      shipPrice,
+      shippingCostAct: shipPrice,
+      shipPhotoUrl: extras.photoUrl || order.shipPhotoUrl || null,
       history: pushHistory(
         order,
         'India → US shipment',
-        'Shipped from India Warehouse to US Warehouse (photo / barcode / weight logged).',
+        `Shipped India Warehouse → US Warehouse. Weight ${weightKg} kg · Price charged ${shipPrice}.${extras.photoUrl ? ' Photo saved.' : ''} Next: generate courier label (tracking).`,
       ),
     },
   }

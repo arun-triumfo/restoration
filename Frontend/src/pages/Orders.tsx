@@ -1,4 +1,5 @@
 import {
+  Camera,
   Eye,
   ExternalLink,
   Lock,
@@ -12,8 +13,8 @@ import {
   Truck,
   Zap,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, ApiError, type ResourceRow } from '../api/client'
 import { normalizeRoleCode } from '../auth/roles'
 import { Badge } from '../components/ui/Badge'
@@ -103,7 +104,9 @@ function locationInfo(order: ResourceRow) {
       wh: 'In transit',
       detail: 'Moving India Warehouse → US Warehouse',
       tone: 'warning' as const,
-      step: 'US manager: click Receive when it arrives',
+      step: order.awb
+        ? 'US manager: click Receive when it arrives'
+        : 'Next: Generate courier label (tracking id)',
     }
   }
   if (st === 'In Process' || sc === 'MAKE') {
@@ -136,8 +139,8 @@ function locationInfo(order: ResourceRow) {
     tone: 'purple' as const,
     step:
       sc === 'INDIA_SHIP'
-        ? 'Step 1: Ship India → US Warehouse'
-        : 'Check stock / next action below',
+        ? 'Step 1: Add weight + photo → Ship to US'
+        : 'Follow the green button on the right',
   }
 }
 
@@ -152,6 +155,7 @@ function skuStock(sku: ResourceRow) {
 export function Orders() {
   const { pushToast } = useApp()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const { list, create, update, remove, loading, error, refresh } = useData()
   const orders = list('orders')
   const skus = list('skus')
@@ -186,8 +190,14 @@ export function Orders() {
   const [form, setForm] = useState<Record<string, string>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [viewOrder, setViewOrder] = useState<ResourceRow | null>(null)
+  const [shipOrder, setShipOrder] = useState<ResourceRow | null>(null)
+  const [shipWeight, setShipWeight] = useState('5')
+  const [shipPrice, setShipPrice] = useState('')
+  const [shipPhoto, setShipPhoto] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  const shipVideoRef = useRef<HTMLVideoElement>(null)
+  const shipStreamRef = useRef<MediaStream | null>(null)
 
   const roleScoped = useMemo(() => {
     if (role === 'super_admin' || role === 'finance') return orders
@@ -370,28 +380,18 @@ export function Orders() {
         </div>
       </div>
 
-      {/* Step guide — less confusing for client */}
       <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
-        <p className="font-bold">How to work an order (step by step)</p>
+        <p className="font-bold">Easy test — only press the primary button shown on each order</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[13px] text-indigo-900/90 dark:text-indigo-100/90">
           <li>
-            <strong>View details</strong> — see rug photo, SKU, and if stock is in India or US.
+            <strong>US stock</strong> → Send barcode to US → US login → Pack → Generate courier label.
           </li>
           <li>
-            <strong>US has stock</strong> → India clicks <em>Send barcode to US</em> → US packs to
-            customer.
+            <strong>India stock</strong> → Ship to US (weight + photo + price) → Generate courier
+            label → US Receive → Pack.
           </li>
           <li>
-            <strong>Only India has stock</strong> → India clicks <em>Ship to US</em> → US clicks{' '}
-            <em>Receive at US</em> → then pack.
-          </li>
-          <li>
-            <strong>No stock</strong> → status In Process → when ready click <em>Mark ready</em> →
-            then Ship to US.
-          </li>
-          <li>
-            <strong>Courier label</strong> → click <em>Generate courier label</em> → tracking id
-            assigns on the order → channel notify for Amazon / Shopify.
+            <strong>No stock</strong> → Mark ready → then same as India stock.
           </li>
         </ol>
       </div>
@@ -602,12 +602,21 @@ export function Orders() {
                             size="sm"
                             className="justify-start"
                             disabled={!!busyAction}
-                            onClick={() =>
-                              runAction(`ship-${oid}`, () => api.fulfillment.shipIndiaToUs(oid))
-                            }
+                            onClick={() => {
+                              setShipOrder(order)
+                              setShipWeight(String(order.shipWeightKg || '5'))
+                              setShipPrice(
+                                order.shipPrice != null
+                                  ? String(order.shipPrice)
+                                  : order.shippingCostAct != null
+                                    ? String(order.shippingCostAct)
+                                    : '',
+                              )
+                              setShipPhoto(null)
+                            }}
                           >
                             <Truck className="h-3.5 w-3.5" />
-                            Ship to US Warehouse
+                            Ship to US (weight + photo + price)
                           </Button>
                         ) : null}
                         {showMake ? (
@@ -887,6 +896,35 @@ export function Orders() {
               ))}
             </div>
 
+            {(viewOrder.shipWeightKg || viewOrder.shipPhotoUrl || viewOrder.shipPrice != null) && (
+              <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] p-3">
+                <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">
+                  India → US package
+                </p>
+                <p className="mt-1 text-sm">
+                  Weight: <strong>{String(viewOrder.shipWeightKg || '—')} kg</strong>
+                  {' · '}
+                  Price charged:{' '}
+                  <strong>
+                    {viewOrder.shipPrice != null || viewOrder.shippingCostAct != null
+                      ? Number(viewOrder.shipPrice ?? viewOrder.shippingCostAct).toFixed(2)
+                      : '—'}
+                  </strong>
+                </p>
+                {viewOrder.shipPhotoUrl ? (
+                  <img
+                    src={
+                      String(viewOrder.shipPhotoUrl).startsWith('http')
+                        ? String(viewOrder.shipPhotoUrl)
+                        : `${api.base.replace(/\/api\/?$/, '')}${String(viewOrder.shipPhotoUrl)}`
+                    }
+                    alt="Ship photo"
+                    className="mt-2 h-28 rounded-lg border object-cover"
+                  />
+                ) : null}
+              </div>
+            )}
+
             {Array.isArray(viewOrder.history) && viewOrder.history.length > 0 ? (
               <div>
                 <p className="mb-1 text-[10px] font-bold uppercase text-[var(--text-dim)]">
@@ -910,6 +948,155 @@ export function Orders() {
             ) : null}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={!!shipOrder}
+        title={shipOrder ? `Ship ${String(shipOrder.orderId)} to US` : 'Ship to US'}
+        badge="India → US"
+        size="lg"
+        onClose={() => {
+          shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+          shipStreamRef.current = null
+          setShipOrder(null)
+          setShipPhoto(null)
+        }}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+                setShipOrder(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!!busyAction || !Number(shipWeight) || shipPrice === ''}
+              onClick={async () => {
+                if (!shipOrder) return
+                const oid = String(shipOrder.orderId)
+                await runAction(`ship-${oid}`, () =>
+                  api.fulfillment.shipIndiaToUs(oid, {
+                    weightKg: Number(shipWeight),
+                    shipPrice: Number(shipPrice),
+                    photoDataUrl: shipPhoto || undefined,
+                  }),
+                )
+                shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+                setShipOrder(null)
+                setShipPhoto(null)
+                setShipPrice('')
+                navigate(`/shipping?orderId=${encodeURIComponent(oid)}`)
+              }}
+            >
+              <Truck className="h-3.5 w-3.5" /> Save & open courier label
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm">
+          <p className="text-[var(--text-muted)]">
+            Before the courier label: enter package <strong>weight</strong>, the{' '}
+            <strong>price charged now</strong>, and a <strong>photo</strong> (recommended). Then
+            create tracking on Shipping Desk.
+          </p>
+          <label className="block text-xs font-semibold text-[var(--text-main)]">
+            Package weight (kg) *
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={shipWeight}
+              onChange={(e) => setShipWeight(e.target.value)}
+              className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-[var(--text-main)]">
+            Price charged at weigh-time *
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={shipPrice}
+              onChange={(e) => setShipPrice(e.target.value)}
+              placeholder="Amount charged / quoted now"
+              className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false,
+                  })
+                  shipStreamRef.current = stream
+                  if (shipVideoRef.current) {
+                    shipVideoRef.current.srcObject = stream
+                    await shipVideoRef.current.play()
+                  }
+                } catch {
+                  pushToast('Camera not available — you can still ship with weight only', 'info')
+                }
+              }}
+            >
+              <Camera className="h-3.5 w-3.5" /> Open camera
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const video = shipVideoRef.current
+                if (!video) return
+                const canvas = document.createElement('canvas')
+                canvas.width = video.videoWidth || 640
+                canvas.height = video.videoHeight || 480
+                const ctx = canvas.getContext('2d')
+                if (!ctx) return
+                ctx.drawImage(video, 0, 0)
+                setShipPhoto(canvas.toDataURL('image/jpeg', 0.7))
+              }}
+            >
+              Snap photo
+            </Button>
+            <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-main)] px-2.5 text-xs font-semibold">
+              Upload photo
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => setShipPhoto(String(reader.result || ''))
+                  reader.readAsDataURL(file)
+                }}
+              />
+            </label>
+          </div>
+          <video
+            ref={shipVideoRef}
+            muted
+            playsInline
+            className="max-h-48 w-full rounded-lg border border-[var(--border-main)] bg-black object-contain"
+          />
+          {shipPhoto ? (
+            <img
+              src={shipPhoto}
+              alt="Package"
+              className="h-32 rounded-lg border object-cover"
+            />
+          ) : null}
+        </div>
       </Modal>
     </div>
   )

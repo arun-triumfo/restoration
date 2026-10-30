@@ -295,10 +295,21 @@ export const api = {
         '/orders/actions/generate-barcode',
         { method: 'POST', body: JSON.stringify({ orderId }) },
       ),
-    shipIndiaToUs: (orderId: string) =>
-      request<{ success: boolean; data: ResourceRow; message?: string }>(
+    shipIndiaToUs: (
+      orderId: string,
+      extras?: { weightKg: number; shipPrice: number; photoDataUrl?: string },
+    ) =>
+      request<{ success: boolean; data: ResourceRow; message?: string; nextStep?: string }>(
         '/orders/actions/ship-india-to-us',
-        { method: 'POST', body: JSON.stringify({ orderId }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId,
+            weightKg: extras?.weightKg,
+            shipPrice: extras?.shipPrice,
+            photoDataUrl: extras?.photoDataUrl,
+          }),
+        },
       ),
     usReceive: (orderId: string) =>
       request<{ success: boolean; data: ResourceRow; message?: string }>(
