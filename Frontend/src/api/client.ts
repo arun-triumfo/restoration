@@ -345,6 +345,10 @@ export const api = {
         widthCm?: number
         heightCm?: number
         dimWeightKg?: number
+        productSku?: string
+        productTitle?: string
+        productCondition?: string
+        productNotes?: string
       },
     ) =>
       request<{ success: boolean; data: ResourceRow; message?: string; nextStep?: string }>(
@@ -390,10 +394,26 @@ export const api = {
 
   returnsApi: {
     buyReturnLabel: (returnId: string) =>
-      request<{ success: boolean; data: ResourceRow; message?: string; label?: ResourceRow }>(
-        '/returns/actions/buy-return-label',
-        { method: 'POST', body: JSON.stringify({ returnId }) },
-      ),
+      request<{
+        success: boolean
+        data: ResourceRow
+        message?: string
+        label?: ResourceRow
+        pnl?: ResourceRow
+      }>('/returns/actions/buy-return-label', {
+        method: 'POST',
+        body: JSON.stringify({ returnId }),
+      }),
+    usReceive: (returnId: string, extras?: { restock?: boolean; condition?: string }) =>
+      request<{
+        success: boolean
+        data: ResourceRow
+        message?: string
+        pnl?: ResourceRow
+      }>('/returns/actions/us-receive', {
+        method: 'POST',
+        body: JSON.stringify({ returnId, ...extras }),
+      }),
   },
 
   purchaseOrders: {

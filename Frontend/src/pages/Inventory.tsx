@@ -82,6 +82,130 @@ export function Inventory() {
   const [form, setForm] = useState<Record<string, string>>({})
   const [deleteSku, setDeleteSku] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+
+  const CSV_HEADERS = [
+    'sku',
+    'odetteSku',
+    'title',
+    'collection',
+    'construction',
+    'material',
+    'size',
+    'sellingPriceUSD',
+    'mfgCostUSD',
+    'weightKg',
+    'barcode',
+    'imageUrl',
+    'indiaAvailable',
+    'usaAvailable',
+  ] as const
+
+  const downloadTemplate = () => {
+    const sample = [
+      CSV_HEADERS.join(','),
+      'SKU-SAMPLE-001,,Sample Braided Jute Rug,Heritage,Flatweave,Jute,5x8,420,180,4.5,BC-SAMPLE-001,,10,0',
+      'SKU-SAMPLE-002,,Sample Wool Kilim,Boho,Handwoven,Wool,2.5x8,310,140,2.2,BC-SAMPLE-002,,5,0',
+    ].join('\n')
+    const blob = new Blob([sample], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'rugos-inventory-bulk-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    pushToast('Template downloaded — fill rows and Bulk CSV Import', 'success')
+  }
+
+  const parseCsvLine = (line: string) => {
+    const out: string[] = []
+    let cur = ''
+    let inQ = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') {
+        inQ = !inQ
+        continue
+      }
+      if (ch === ',' && !inQ) {
+        out.push(cur.trim())
+        cur = ''
+        continue
+      }
+      cur += ch
+    }
+    out.push(cur.trim())
+    return out
+  }
+
+  const importCsvFile = async (file: File) => {
+    try {
+      setImporting(true)
+      const text = await file.text()
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+      if (lines.length < 2) throw new Error('CSV needs a header row + at least 1 data row')
+      const headers = parseCsvLine(lines[0]).map((h) => h.replace(/^\uFEFF/, ''))
+      let ok = 0
+      let fail = 0
+      for (const line of lines.slice(1)) {
+        const cols = parseCsvLine(line)
+        const row: Record<string, string> = {}
+        headers.forEach((h, i) => {
+          row[h] = cols[i] ?? ''
+        })
+        const sku = String(row.sku || '').trim()
+        if (!sku) {
+          fail += 1
+          continue
+        }
+        const india = Number(row.indiaAvailable || 0) || 0
+        const usa = Number(row.usaAvailable || 0) || 0
+        const payload: ResourceRow = {
+          sku,
+          odetteSku: row.odetteSku || '',
+          title: row.title || sku,
+          collection: row.collection || '',
+          construction: row.construction || '',
+          material: row.material || '',
+          size: row.size || '',
+          sellingPriceUSD: Number(row.sellingPriceUSD || 0),
+          mfgCostUSD: Number(row.mfgCostUSD || 0),
+          weightKg: Number(row.weightKg || 0),
+          barcode: row.barcode || '',
+          imageUrl: row.imageUrl || '',
+          indiaAvailable: india,
+          usaAvailable: usa,
+          stock: {
+            indiaAvailable: india,
+            indiaPacked: 0,
+            inTransit: 0,
+            usaAvailable: usa,
+            usaReserved: 0,
+            fba: 0,
+          },
+        }
+        try {
+          const existing = skus.find((s) => String(s.sku) === sku)
+          if (existing) {
+            await update('skus', sku, { ...existing, ...payload })
+          } else {
+            await create('skus', payload)
+          }
+          ok += 1
+        } catch {
+          fail += 1
+        }
+      }
+      pushToast(`Bulk import done: ${ok} saved${fail ? `, ${fail} failed` : ''}`, ok ? 'success' : 'danger')
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : 'CSV import failed', 'danger')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     return skus.filter((sku) => {
@@ -222,9 +346,24 @@ export function Inventory() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={() => openModal('import')}>
-            <Upload className="h-3.5 w-3.5" /> Bulk CSV Import
+          <Button variant="secondary" size="sm" onClick={downloadTemplate}>
+            <Download className="h-3.5 w-3.5" /> Download CSV template
           </Button>
+          <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-2.5 text-xs font-semibold hover:bg-[var(--bg-elevated)]">
+            <Upload className="h-3.5 w-3.5" />
+            {importing ? 'Importing…' : 'Bulk CSV Import'}
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              disabled={importing}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) void importCsvFile(file)
+              }}
+            />
+          </label>
           <Button variant="secondary" size="sm" onClick={() => openModal('export', 'Catalog')}>
             <Download className="h-3.5 w-3.5" /> Export Catalog
           </Button>

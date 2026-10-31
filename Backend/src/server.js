@@ -37,7 +37,7 @@ import {
   shipIndiaToUs,
   usReceive,
 } from './controllers/fulfillmentController.js'
-import { buyReturnLabel } from './controllers/returnsController.js'
+import { buyReturnLabel, usReceiveReturn } from './controllers/returnsController.js'
 import { RESOURCES } from './resources.js'
 
 dotenv.config()
@@ -191,6 +191,13 @@ app.post(
   requireActiveBilling,
   requirePermission('returns', 'write'),
   buyReturnLabel,
+)
+app.post(
+  '/api/returns/actions/us-receive',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('returns', 'write'),
+  usReceiveReturn,
 )
 
 app.use('/api/resources', authenticate, requireActiveBilling, resourceRoutes)

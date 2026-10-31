@@ -1,11 +1,11 @@
 /**
- * Scenario D — Returns land in India WH bucket.
- * Platform return labels (Amazon/Shopify/…) + PDF + product detail for Accounts P&L.
+ * Returns: India opens → platform return label → US bucket receive.
+ * P&L = -refund - labelCost + restockValue (if restockable).
  */
 import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
 import { getResourceModel } from '../models/createResourceModel.js'
 import { pushHistory } from '../services/orderFulfillment.js'
-import { buyPlatformReturnLabel } from '../services/platformLabels.js'
+import { buyPlatformReturnLabel, detectPlatform, platformLabelSource } from '../services/platformLabels.js'
 
 function tenantIdOf(req) {
   return req.user?.tenantId || DEFAULT_TENANT_ID
@@ -17,6 +17,10 @@ function Returns() {
 
 function Orders() {
   return getResourceModel('orders', 'orderId', true)
+}
+
+function Skus() {
+  return getResourceModel('skus', 'sku', true)
 }
 
 function Monthly() {
@@ -32,7 +36,45 @@ function tenantFilter(tid) {
   return { tenantId: tid }
 }
 
-/** POST /api/returns/actions/buy-return-label  body: { returnId } */
+function calcReturnPnL({ refundUSD, labelCostUSD, mfgCostUSD, restockable }) {
+  const refund = Math.abs(Number(refundUSD) || 0)
+  const labelCost = Math.abs(Number(labelCostUSD) || 0)
+  const mfg = Math.abs(Number(mfgCostUSD) || 0)
+  const restockValue = restockable ? mfg : 0
+  // Net P&L impact (negative = loss): refund paid out + label spend − inventory value recovered
+  const profitImpactUSD = Math.round((-refund - labelCost + restockValue) * 100) / 100
+  return {
+    refundUSD: refund,
+    labelCostUSD: labelCost,
+    mfgCostUSD: mfg,
+    restockValueUSD: restockValue,
+    profitImpactUSD,
+    pnlBreakdown: `Refund -$${refund.toFixed(2)} − Label -$${labelCost.toFixed(2)} + Restock +$${restockValue.toFixed(2)} = ${profitImpactUSD.toFixed(2)}`,
+  }
+}
+
+async function rollMonthlyPnL(tid, { labelCost, refund, profitImpact }) {
+  const period = new Date().toISOString().slice(0, 7)
+  const existing = await Monthly().findOne({ period, tenantId: tid }).lean()
+  await Monthly().findOneAndUpdate(
+    { period, tenantId: tid },
+    {
+      $set: {
+        period,
+        periodShort: period,
+        tenantId: tid,
+        shippingOutflowsUSD: Number(existing?.shippingOutflowsUSD || 0) + Number(labelCost || 0),
+        returnsCostUSD: Number(existing?.returnsCostUSD || 0) + Number(refund || 0) + Number(labelCost || 0),
+        returnsRefundUSD: Number(existing?.returnsRefundUSD || 0) + Number(refund || 0),
+        returnsPnLUSD: Number(existing?.returnsPnLUSD || 0) + Number(profitImpact || 0),
+        updatedFrom: 'return_flow',
+      },
+    },
+    { upsert: true },
+  )
+}
+
+/** POST /api/returns/actions/buy-return-label */
 export async function buyReturnLabel(req, res) {
   try {
     const tid = tenantIdOf(req)
@@ -59,34 +101,73 @@ export async function buyReturnLabel(req, res) {
         .lean()
     }
 
-    const label = await buyPlatformReturnLabel(ret, order, tid)
-    const history = pushHistory(
-      ret,
-      'Return label generated',
-      `${label.source} return label ${label.awb}. PDF ready to send to customer. Cost $${label.amount} for Accounts.`,
+    const channel = ret.channel || ret.platform || order?.channel || ''
+    const platform = detectPlatform(channel)
+    const source = platformLabelSource(platform)
+
+    let skuDoc = null
+    const skuCode = ret.sku || order?.sku
+    if (skuCode) {
+      skuDoc = await Skus()
+        .findOne({ $and: [tenantFilter(tid), { sku: String(skuCode) }] })
+        .lean()
+    }
+
+    const qty = Math.max(1, Number(ret.qty || order?.qty || 1))
+    const refundUSD =
+      Number(ret.refundUSD) ||
+      Number(order?.totalOrderUSD) ||
+      Number(order?.unitPriceUSD || skuDoc?.sellingPriceUSD || 0) * qty
+    const mfgCostUSD = Number(skuDoc?.mfgCostUSD || ret.mfgCostUSD || 0) * qty
+    const restockable = String(ret.condition || req.body?.condition || 'Good').toLowerCase() !== 'damaged'
+
+    const label = await buyPlatformReturnLabel(
+      { ...ret, channel, platform, sku: skuCode, qty },
+      order,
+      tid,
     )
 
-    const profitImpactUSD = -Math.abs(Number(label.amount) || 0)
+    const pnl = calcReturnPnL({
+      refundUSD,
+      labelCostUSD: label.amount,
+      mfgCostUSD,
+      restockable,
+    })
+
+    const history = pushHistory(
+      ret,
+      'Return label → US bucket',
+      `${source} (${platform}) label ${label.awb}. PDF for customer. Moved to US Warehouse for receive. ${pnl.pnlBreakdown}`,
+    )
 
     const data = await Returns()
       .findOneAndUpdate(
         { $and: [tenantFilter(tid), { returnId }] },
         {
           $set: {
-            queueOwner: 'india_wh',
+            queueOwner: 'usa_wh',
+            channel: channel || source,
+            platform,
+            returnPlatform: platform,
+            returnLabelSource: source,
             returnAwb: label.awb,
             returnLabelPdfUrl: label.labelPdfUrl,
-            returnLabelSource: label.source,
-            returnPlatform: label.platform,
             returnLabelCost: label.amount,
             returnLabelCurrency: label.currency,
             returnTrackingUrl: label.trackingUrl,
             productDetail: label.productDetail,
-            sku: ret.sku || order?.sku || null,
-            qty: ret.qty || order?.qty || 1,
-            status: 'Return Label Sent',
-            profitImpactUSD,
+            sku: skuCode || null,
+            qty,
+            refundUSD: pnl.refundUSD,
+            mfgCostUSD: pnl.mfgCostUSD,
+            restockValueUSD: pnl.restockValueUSD,
+            labelCostUSD: pnl.labelCostUSD,
+            profitImpactUSD: pnl.profitImpactUSD,
+            pnlBreakdown: pnl.pnlBreakdown,
+            condition: ret.condition || req.body?.condition || 'Good',
+            status: 'Awaiting US Receive',
             accountsTagged: true,
+            labelSentAt: new Date().toISOString(),
             history,
           },
         },
@@ -94,26 +175,12 @@ export async function buyReturnLabel(req, res) {
       )
       .lean()
 
-    // Roll a simple hit into current-month profitability for Accounts
     try {
-      const period = new Date().toISOString().slice(0, 7)
-      const existing = await Monthly().findOne({ period, tenantId: tid }).lean()
-      const shippingOut = Number(existing?.shippingOutflowsUSD || 0) + Number(label.amount)
-      const returnsCost = Number(existing?.returnsCostUSD || 0) + Number(label.amount)
-      await Monthly().findOneAndUpdate(
-        { period, tenantId: tid },
-        {
-          $set: {
-            period,
-            periodShort: period,
-            tenantId: tid,
-            shippingOutflowsUSD: shippingOut,
-            returnsCostUSD: returnsCost,
-            updatedFrom: 'return_label',
-          },
-        },
-        { upsert: true },
-      )
+      await rollMonthlyPnL(tid, {
+        labelCost: pnl.labelCostUSD,
+        refund: pnl.refundUSD,
+        profitImpact: pnl.profitImpactUSD,
+      })
     } catch {
       /* non-fatal */
     }
@@ -124,11 +191,105 @@ export async function buyReturnLabel(req, res) {
       label: {
         awb: label.awb,
         labelPdfUrl: label.labelPdfUrl,
-        source: label.source,
+        source,
+        platform,
         amount: label.amount,
         mode: label.mode,
       },
-      message: `Return label PDF created via ${label.source}. Send to customer. Cost logged for Accounts.`,
+      pnl,
+      message: `Return label via ${source}. Sent to US bucket (Awaiting US Receive). P&L: ${pnl.profitImpactUSD}`,
+    })
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message })
+  }
+}
+
+/** POST /api/returns/actions/us-receive  body: { returnId, restock?: boolean, condition? } */
+export async function usReceiveReturn(req, res) {
+  try {
+    const tid = tenantIdOf(req)
+    const role = req.user?.roleCode
+    if (!['super_admin', 'usa_wh'].includes(role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only US Warehouse Manager can receive returns',
+      })
+    }
+    const returnId = String(req.body?.returnId || '').trim()
+    if (!returnId) return res.status(400).json({ success: false, message: 'returnId required' })
+
+    const ret = await Returns()
+      .findOne({ $and: [tenantFilter(tid), { returnId }] })
+      .lean()
+    if (!ret) return res.status(404).json({ success: false, message: 'Return not found' })
+
+    const restock = req.body?.restock !== false
+    const condition = req.body?.condition || ret.condition || 'Good'
+    const restockable = restock && String(condition).toLowerCase() !== 'damaged'
+
+    const pnl = calcReturnPnL({
+      refundUSD: ret.refundUSD,
+      labelCostUSD: ret.returnLabelCost || ret.labelCostUSD,
+      mfgCostUSD: ret.mfgCostUSD,
+      restockable,
+    })
+
+    // Restock into US available if SKU known
+    if (restockable && ret.sku) {
+      try {
+        const Sku = Skus()
+        const skuDoc = await Sku.findOne({ $and: [tenantFilter(tid), { sku: String(ret.sku) }] })
+        if (skuDoc) {
+          const stock = skuDoc.stock || {}
+          const usa = Number(stock.usaAvailable || skuDoc.usaAvailable || 0) + Number(ret.qty || 1)
+          await Sku.findOneAndUpdate(
+            { $and: [tenantFilter(tid), { sku: String(ret.sku) }] },
+            {
+              $set: {
+                'stock.usaAvailable': usa,
+                usaAvailable: usa,
+              },
+            },
+          )
+        }
+      } catch {
+        /* non-fatal */
+      }
+    }
+
+    const history = pushHistory(
+      ret,
+      'US received return',
+      `Received at US Warehouse. Condition: ${condition}. ${restockable ? 'Restocked to US inventory.' : 'Not restocked.'} ${pnl.pnlBreakdown}`,
+    )
+
+    const data = await Returns()
+      .findOneAndUpdate(
+        { $and: [tenantFilter(tid), { returnId }] },
+        {
+          $set: {
+            queueOwner: 'usa_wh',
+            status: restockable ? 'Restocked' : 'Received — No Restock',
+            condition,
+            restocked: restockable,
+            receivedAt: new Date().toISOString(),
+            restockValueUSD: pnl.restockValueUSD,
+            profitImpactUSD: pnl.profitImpactUSD,
+            pnlBreakdown: pnl.pnlBreakdown,
+            history,
+          },
+        },
+        { new: true },
+      )
+      .lean()
+
+    res.json({
+      success: true,
+      data,
+      pnl,
+      message: restockable
+        ? 'Return received and restocked at US Warehouse'
+        : 'Return received — not restocked (damaged / hold)',
     })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })

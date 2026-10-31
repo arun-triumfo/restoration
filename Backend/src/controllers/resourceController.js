@@ -113,17 +113,36 @@ export function createResource(resource) {
         payload = await routeNewOrderPayload(payload, tenantIdOf(req))
       }
 
-      // Scenario D: all returns land with India Warehouse Manager
+      // Returns: India opens → platform label → US receive. Enrich from linked order.
       if (resource === 'returns') {
+        let order = null
+        if (payload.orderId) {
+          try {
+            const Order = getResourceModel('orders', 'orderId', true)
+            order = await Order.findOne({
+              $and: [tenantFilter(req), { orderId: String(payload.orderId) }],
+            }).lean()
+          } catch {
+            /* ignore */
+          }
+        }
+        const channel = payload.channel || payload.platform || order?.channel || ''
         payload = {
           ...payload,
           queueOwner: 'india_wh',
           status: payload.status || 'Pending Inspection',
+          channel,
+          platform: payload.platform || channel,
+          sku: payload.sku || order?.sku || null,
+          qty: payload.qty || order?.qty || 1,
+          customer: payload.customer || order?.buyerName || null,
+          customerEmail: payload.customerEmail || order?.buyerEmail || null,
+          refundUSD: payload.refundUSD ?? order?.totalOrderUSD ?? null,
           accountsTagged: true,
           history: pushHistory(
             payload,
             'Return opened',
-            'Routed to India Warehouse Manager. Generate platform return label (Amazon/Shopify/…) and send PDF to customer.',
+            `Platform: ${channel || 'unknown'}. India WH generates return label via that platform, then sends to US bucket.`,
           ),
         }
       }

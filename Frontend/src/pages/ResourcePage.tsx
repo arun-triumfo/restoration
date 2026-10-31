@@ -1,6 +1,7 @@
-import { Pencil, Plus, Printer, Search, Trash2 } from 'lucide-react'
+import { Package, Pencil, Plus, Printer, Search, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { api, type ResourceRow } from '../api/client'
+import { normalizeRoleCode } from '../auth/roles'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -75,6 +76,7 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
   const { pushToast } = useApp()
   const { list, create, update, remove, getId, loading, error, refresh } = useData()
   const rows = list(meta.key)
+  const role = normalizeRoleCode(String(user?.roleCode || ''))
   const canWrite =
     user?.roleCode === 'super_admin' ||
     Boolean(user?.permissions?.actions?.includes('write')) ||
@@ -88,6 +90,22 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [labelBusy, setLabelBusy] = useState<string | null>(null)
+
+  const scopedRows = useMemo(() => {
+    if (meta.key !== 'returns') return rows
+    if (role === 'super_admin' || role === 'finance') return rows
+    if (role === 'usa_wh') {
+      return rows.filter((r) => String(r.queueOwner || '') === 'usa_wh')
+    }
+    if (role === 'india_wh') {
+      return rows.filter(
+        (r) =>
+          String(r.queueOwner || 'india_wh') === 'india_wh' ||
+          String(r.status || '').includes('Pending'),
+      )
+    }
+    return rows
+  }, [meta.key, rows, role])
 
   const tableCols = meta.columns.filter((c) => c.table !== false)
   const formCols = meta.columns.filter((c) => c.form !== false)
@@ -123,13 +141,13 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter((row) =>
+    if (!q) return scopedRows
+    return scopedRows.filter((row) =>
       tableCols
         .filter((c) => c.format !== 'image')
         .some((c) => cellValue(row, c).toLowerCase().includes(q)),
     )
-  }, [rows, query, tableCols])
+  }, [scopedRows, query, tableCols])
 
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize)
 
@@ -258,7 +276,7 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
                     <td className="px-4 py-3">
                       {canWrite ? (
                         <div className="flex flex-col gap-1">
-                          {meta.key === 'returns' ? (
+                          {meta.key === 'returns' && (role === 'india_wh' || role === 'super_admin') && !row.returnAwb ? (
                             <Button
                               variant="secondary"
                               size="sm"
@@ -289,7 +307,40 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
                               }}
                             >
                               <Printer className="h-3.5 w-3.5" />
-                              {labelBusy === id ? 'Label…' : 'Buy return label (PDF)'}
+                              {labelBusy === id
+                                ? 'Label…'
+                                : `Buy ${String(row.channel || row.platform || 'platform')} return label`}
+                            </Button>
+                          ) : null}
+                          {meta.key === 'returns' &&
+                          (role === 'usa_wh' || role === 'super_admin') &&
+                          String(row.status || '').includes('Awaiting US') ? (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              className="justify-start"
+                              disabled={!!labelBusy}
+                              onClick={async () => {
+                                try {
+                                  setLabelBusy(id)
+                                  const res = await api.returnsApi.usReceive(id, {
+                                    restock: true,
+                                    condition: String(row.condition || 'Good'),
+                                  })
+                                  pushToast(res.message || 'Return received', 'success')
+                                  await refresh()
+                                } catch (err) {
+                                  pushToast(
+                                    err instanceof Error ? err.message : 'Receive failed',
+                                    'error',
+                                  )
+                                } finally {
+                                  setLabelBusy(null)
+                                }
+                              }}
+                            >
+                              <Package className="h-3.5 w-3.5" />
+                              {labelBusy === id ? 'Receiving…' : 'Receive at US + restock'}
                             </Button>
                           ) : null}
                           {meta.key === 'returns' && row.returnLabelPdfUrl ? (
@@ -305,6 +356,11 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
                             >
                               Open label PDF
                             </a>
+                          ) : null}
+                          {meta.key === 'returns' && row.pnlBreakdown ? (
+                            <p className="max-w-[200px] text-[10px] text-[var(--text-dim)]">
+                              {String(row.pnlBreakdown)}
+                            </p>
                           ) : null}
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" aria-label="Edit" onClick={() => openEdit(row)}>

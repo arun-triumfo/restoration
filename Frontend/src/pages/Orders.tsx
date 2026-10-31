@@ -9,6 +9,7 @@ import {
   Printer,
   RefreshCw,
   Search,
+  SwitchCamera,
   Trash2,
   Truck,
   Zap,
@@ -225,10 +226,64 @@ export function Orders() {
   const [shipWid, setShipWid] = useState('')
   const [shipHt, setShipHt] = useState('')
   const [shipPhoto, setShipPhoto] = useState<string | null>(null)
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment')
+  const [productSku, setProductSku] = useState('')
+  const [productTitle, setProductTitle] = useState('')
+  const [productCondition, setProductCondition] = useState('Good')
+  const [productNotes, setProductNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const shipVideoRef = useRef<HTMLVideoElement>(null)
   const shipStreamRef = useRef<MediaStream | null>(null)
+
+  const stopCamera = () => {
+    shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+    shipStreamRef.current = null
+  }
+
+  const openCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
+    try {
+      stopCamera()
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facing } },
+        audio: false,
+      })
+      shipStreamRef.current = stream
+      setCameraFacing(facing)
+      if (shipVideoRef.current) {
+        shipVideoRef.current.srcObject = stream
+        await shipVideoRef.current.play()
+      }
+    } catch {
+      pushToast('Camera not available — upload a photo instead', 'info')
+    }
+  }
+
+  const switchCamera = () => {
+    const next = cameraFacing === 'environment' ? 'user' : 'environment'
+    void openCamera(next)
+  }
+
+  const snapPhoto = () => {
+    const video = shipVideoRef.current
+    if (!video) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(video, 0, 0)
+    setShipPhoto(canvas.toDataURL('image/jpeg', 0.7))
+  }
+
+  const fillProductFromOrder = (order: ResourceRow) => {
+    const sku = String(order.sku || '')
+    const info = skuMap.get(sku)
+    setProductSku(sku)
+    setProductTitle(info?.title || String(order.shipProductTitle || ''))
+    setProductCondition(String(order.shipProductCondition || 'Good'))
+    setProductNotes(String(order.shipProductNotes || ''))
+  }
 
   const roleScoped = useMemo(() => {
     if (role === 'super_admin' || role === 'finance') return orders
@@ -657,6 +712,7 @@ export function Orders() {
                               setShipWid(order.shipWidthCm != null ? String(order.shipWidthCm) : '')
                               setShipHt(order.shipHeightCm != null ? String(order.shipHeightCm) : '')
                               setShipPhoto(null)
+                              fillProductFromOrder(order)
                             }}
                           >
                             <Truck className="h-3.5 w-3.5" />
@@ -1068,8 +1124,7 @@ export function Orders() {
         badge="India → Customer"
         size="lg"
         onClose={() => {
-          shipStreamRef.current?.getTracks().forEach((t) => t.stop())
-          shipStreamRef.current = null
+          stopCamera()
           setShipOrder(null)
           setShipPhoto(null)
         }}
@@ -1078,7 +1133,7 @@ export function Orders() {
             <Button
               variant="secondary"
               onClick={() => {
-                shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+                stopCamera()
                 setShipOrder(null)
               }}
             >
@@ -1097,9 +1152,13 @@ export function Orders() {
                     widthCm: shipWid ? Number(shipWid) : undefined,
                     heightCm: shipHt ? Number(shipHt) : undefined,
                     photoDataUrl: shipPhoto || undefined,
+                    productSku: productSku || undefined,
+                    productTitle: productTitle || undefined,
+                    productCondition: productCondition || undefined,
+                    productNotes: productNotes || undefined,
                   }),
                 )
-                shipStreamRef.current?.getTracks().forEach((t) => t.stop())
+                stopCamera()
                 setShipOrder(null)
                 setShipPhoto(null)
                 navigate(`/shipping?orderId=${encodeURIComponent(oid)}`)
@@ -1112,10 +1171,53 @@ export function Orders() {
       >
         <div className="space-y-3 text-sm">
           <p className="text-[var(--text-muted)]">
-            India ships <strong>direct to the US customer</strong>. Enter <strong>weight</strong>{' '}
-            (optional dims/photo). Next screen: Shipping Desk will pull the{' '}
-            <strong>live courier rate by weight</strong> — no manual price.
+            India ships <strong>direct to the US customer</strong>. Enter <strong>weight</strong>,
+            confirm <strong>product info</strong>, take photo (front/back camera). Next: live courier
+            rate by weight.
           </p>
+          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] p-3 space-y-2">
+            <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">Product information</p>
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              SKU
+              <input
+                value={productSku}
+                onChange={(e) => setProductSku(e.target.value)}
+                className="mt-1 h-9 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-[var(--text-main)]">
+              Product title
+              <input
+                value={productTitle}
+                onChange={(e) => setProductTitle(e.target.value)}
+                className="mt-1 h-9 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 text-sm"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-xs font-semibold text-[var(--text-main)]">
+                Condition
+                <select
+                  value={productCondition}
+                  onChange={(e) => setProductCondition(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 text-sm"
+                >
+                  <option>Good</option>
+                  <option>New / unused</option>
+                  <option>Minor defect</option>
+                  <option>Damaged</option>
+                </select>
+              </label>
+              <label className="block text-xs font-semibold text-[var(--text-main)]">
+                Notes
+                <input
+                  value={productNotes}
+                  onChange={(e) => setProductNotes(e.target.value)}
+                  placeholder="Optional"
+                  className="mt-1 h-9 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 text-sm"
+                />
+              </label>
+            </div>
+          </div>
           <label className="block text-xs font-semibold text-[var(--text-main)]">
             Package weight (kg) *
             <input
@@ -1160,44 +1262,14 @@ export function Orders() {
             </label>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' },
-                    audio: false,
-                  })
-                  shipStreamRef.current = stream
-                  if (shipVideoRef.current) {
-                    shipVideoRef.current.srcObject = stream
-                    await shipVideoRef.current.play()
-                  }
-                } catch {
-                  pushToast('Camera not available — you can still continue with weight only', 'info')
-                }
-              }}
-            >
+            <Button type="button" variant="secondary" size="sm" onClick={() => void openCamera()}>
               <Camera className="h-3.5 w-3.5" /> Open camera
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                const video = shipVideoRef.current
-                if (!video) return
-                const canvas = document.createElement('canvas')
-                canvas.width = video.videoWidth || 640
-                canvas.height = video.videoHeight || 480
-                const ctx = canvas.getContext('2d')
-                if (!ctx) return
-                ctx.drawImage(video, 0, 0)
-                setShipPhoto(canvas.toDataURL('image/jpeg', 0.7))
-              }}
-            >
+            <Button type="button" variant="secondary" size="sm" onClick={switchCamera}>
+              <SwitchCamera className="h-3.5 w-3.5" />
+              {cameraFacing === 'environment' ? 'Switch to front' : 'Switch to back'}
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={snapPhoto}>
               Snap photo
             </Button>
             <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-main)] px-2.5 text-xs font-semibold">
@@ -1216,6 +1288,9 @@ export function Orders() {
               />
             </label>
           </div>
+          <p className="text-[11px] text-[var(--text-dim)]">
+            Camera: {cameraFacing === 'environment' ? 'Back' : 'Front'}
+          </p>
           <video
             ref={shipVideoRef}
             muted
@@ -1337,44 +1412,14 @@ export function Orders() {
             </label>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' },
-                    audio: false,
-                  })
-                  shipStreamRef.current = stream
-                  if (shipVideoRef.current) {
-                    shipVideoRef.current.srcObject = stream
-                    await shipVideoRef.current.play()
-                  }
-                } catch {
-                  pushToast('Camera not available', 'info')
-                }
-              }}
-            >
+            <Button type="button" variant="secondary" size="sm" onClick={() => void openCamera()}>
               <Camera className="h-3.5 w-3.5" /> Open camera
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                const video = shipVideoRef.current
-                if (!video) return
-                const canvas = document.createElement('canvas')
-                canvas.width = video.videoWidth || 640
-                canvas.height = video.videoHeight || 480
-                const ctx = canvas.getContext('2d')
-                if (!ctx) return
-                ctx.drawImage(video, 0, 0)
-                setShipPhoto(canvas.toDataURL('image/jpeg', 0.7))
-              }}
-            >
+            <Button type="button" variant="secondary" size="sm" onClick={switchCamera}>
+              <SwitchCamera className="h-3.5 w-3.5" />
+              {cameraFacing === 'environment' ? 'Switch to front' : 'Switch to back'}
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={snapPhoto}>
               Snap photo
             </Button>
             <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-main)] px-2.5 text-xs font-semibold">
@@ -1393,6 +1438,9 @@ export function Orders() {
               />
             </label>
           </div>
+          <p className="text-[11px] text-[var(--text-dim)]">
+            Camera: {cameraFacing === 'environment' ? 'Back' : 'Front'}
+          </p>
           <video
             ref={shipVideoRef}
             muted

@@ -219,6 +219,10 @@ export async function shipIndiaToCustomer(req, res) {
       heightCm: req.body?.heightCm,
       dimWeightKg: req.body?.dimWeightKg,
       photoUrl,
+      productSku: req.body?.productSku,
+      productTitle: req.body?.productTitle,
+      productCondition: req.body?.productCondition,
+      productNotes: req.body?.productNotes,
     })
     if (result.error) return res.status(409).json({ success: false, message: result.error })
 

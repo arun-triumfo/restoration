@@ -58,6 +58,7 @@ export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
     '/orders',
     '/stock-transfers',
     '/warehouses',
+    '/returns',
     '/stock-history',
     '/packing',
     '/shipping',

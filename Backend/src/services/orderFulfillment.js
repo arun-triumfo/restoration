@@ -263,10 +263,14 @@ export function applyIndiaCustomerShipPrep(order, extras = {}) {
       shipWidthCm: widthCm,
       shipHeightCm: heightCm,
       dimWeightKg: dimWeightKg,
+      shipProductSku: extras.productSku || order.sku || null,
+      shipProductTitle: extras.productTitle || null,
+      shipProductCondition: extras.productCondition || null,
+      shipProductNotes: extras.productNotes || null,
       history: pushHistory(
         order,
         'India → customer prep',
-        `Weight ${weightKg} kg saved${dimWeightKg != null ? ` · dim wt ${dimWeightKg} kg` : ''}.${extras.photoUrl ? ' Photo saved.' : ''} Next: Shipping Desk — live courier rate by weight → buy label → pack → dispatch.`,
+        `Weight ${weightKg} kg saved${dimWeightKg != null ? ` · dim wt ${dimWeightKg} kg` : ''}.${extras.photoUrl ? ' Photo saved.' : ''}${extras.productTitle ? ` · Product: ${extras.productTitle}` : ''}. Next: Shipping Desk — live courier rate by weight → buy label → pack → dispatch.`,
       ),
     },
   }
