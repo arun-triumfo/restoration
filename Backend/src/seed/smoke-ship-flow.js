@@ -22,7 +22,6 @@ async function main() {
   console.log('B prep without weight →', applyIndiaCustomerShipPrep(b || {}, {}).error)
   const prep = applyIndiaCustomerShipPrep(b || { fulfillmentScenario: 'INDIA_SHIP' }, {
     weightKg: 4.5,
-    shipPrice: 42,
     lengthCm: 120,
     widthCm: 15,
     heightCm: 15,

@@ -214,7 +214,6 @@ export async function shipIndiaToCustomer(req, res) {
 
     const result = applyIndiaCustomerShipPrep(order, {
       weightKg: req.body?.weightKg,
-      shipPrice: req.body?.shipPrice,
       lengthCm: req.body?.lengthCm,
       widthCm: req.body?.widthCm,
       heightCm: req.body?.heightCm,
@@ -228,7 +227,7 @@ export async function shipIndiaToCustomer(req, res) {
       success: true,
       data,
       message:
-        'Weight and bill saved. Next: Generate courier label (India → customer), print PDF, pack, then Dispatch to customer.',
+        'Weight saved. Next: Shipping Desk — live courier rate by weight → buy label → pack → Dispatch to customer.',
       nextStep: 'shipping_label',
     })
   } catch (err) {

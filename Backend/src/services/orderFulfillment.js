@@ -198,14 +198,14 @@ export function applySendCourierLabelToUs(order, label) {
       shipPrice: label.amount,
       lastLabelLeg: 'PLATFORM_TO_CUSTOMER_VIA_US',
       queueOwner: 'usa_wh',
-      status: 'Pending Allocation',
+      status: 'Ready to Pack',
       fulfillmentWh: 'US Warehouse',
       stockAt: 'US Warehouse',
-      stockAllocation: 'Courier label PDF with US Warehouse — pack & send',
+      stockAllocation: 'Label ready — US print label, pack & dispatch to customer',
       history: pushHistory(
         order,
         'Courier label → US Warehouse',
-        `${label.source} label ${label.awb} generated (${label.mode}). PDF sent to US Warehouse Manager. India keeps history & can track. US: pack and send to customer.`,
+        `${label.source} label ${label.awb} generated (${label.mode}). PDF with US Warehouse. Removed from India queue. US: print label → pack → dispatch to customer.`,
       ),
     },
   }
@@ -234,10 +234,6 @@ export function applyIndiaCustomerShipPrep(order, extras = {}) {
   if (!weightKg || weightKg <= 0) {
     return { error: 'Package weight (kg) is required before India → customer ship' }
   }
-  const shipPrice = Number(extras.shipPrice)
-  if (!Number.isFinite(shipPrice) || shipPrice < 0) {
-    return { error: 'Courier rate / total bill amount is required (shipping audit)' }
-  }
 
   const lengthCm = extras.lengthCm != null ? Number(extras.lengthCm) : null
   const widthCm = extras.widthCm != null ? Number(extras.widthCm) : null
@@ -259,12 +255,9 @@ export function applyIndiaCustomerShipPrep(order, extras = {}) {
       status: 'Ready to Label',
       fulfillmentWh: 'India Warehouse',
       stockAt: 'India Warehouse',
-      stockAllocation: 'India → customer: weight/bill saved — buy courier label next',
+      stockAllocation: 'India → customer: weight saved — get live courier rate & buy label next',
       fulfillmentScenario: order.fulfillmentScenario || SCENARIO.INDIA_SHIP,
       shipWeightKg: weightKg,
-      shipPrice,
-      shippingCostAct: shipPrice,
-      shippingCostEst: shipPrice,
       shipPhotoUrl: extras.photoUrl || order.shipPhotoUrl || null,
       shipLengthCm: lengthCm,
       shipWidthCm: widthCm,
@@ -273,7 +266,7 @@ export function applyIndiaCustomerShipPrep(order, extras = {}) {
       history: pushHistory(
         order,
         'India → customer prep',
-        `Weight ${weightKg} kg · bill/rate ${shipPrice}${dimWeightKg != null ? ` · dim wt ${dimWeightKg} kg` : ''}.${extras.photoUrl ? ' Photo saved.' : ''} Next: generate courier label (customer address) → print → pack → dispatch.`,
+        `Weight ${weightKg} kg saved${dimWeightKg != null ? ` · dim wt ${dimWeightKg} kg` : ''}.${extras.photoUrl ? ' Photo saved.' : ''} Next: Shipping Desk — live courier rate by weight → buy label → pack → dispatch.`,
       ),
     },
   }

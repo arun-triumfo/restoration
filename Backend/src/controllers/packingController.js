@@ -125,7 +125,7 @@ export async function listPackingQueue(req, res) {
     const role = req.user?.roleCode
     const filter = {
       tenantId: tid,
-      status: { $regex: /pending|allocat|pick|open|ready/i },
+      status: { $regex: /pending|allocat|pick|open|ready|label/i },
     }
     // US manager packs customer orders in their bucket; India packs India→US / mill
     if (role === 'usa_wh') {

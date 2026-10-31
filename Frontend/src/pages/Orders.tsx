@@ -78,6 +78,8 @@ function inUsQueue(order: ResourceRow) {
 function isPending(st: string) {
   return (
     st === 'Pending Allocation' ||
+    st === 'Ready to Pack' ||
+    st === 'Ready to Label' ||
     st === 'In Process' ||
     st.toLowerCase().includes('ready')
   )
@@ -85,11 +87,12 @@ function isPending(st: string) {
 
 function pendingRank(st: string) {
   if (st === 'Pending Allocation') return 0
-  if (st === 'In Process') return 1
-  if (st === 'In Transit') return 2
-  if (st.includes('Packed')) return 3
-  if (st === 'Delivered') return 4
-  return 5
+  if (st === 'Ready to Pack' || st === 'Ready to Label') return 1
+  if (st === 'In Process') return 2
+  if (st === 'In Transit') return 3
+  if (st.includes('Packed')) return 4
+  if (st === 'Delivered') return 5
+  return 6
 }
 
 /** Where the rug is right now — India WH / US WH / direct-to-customer / make */
@@ -133,10 +136,10 @@ function locationInfo(order: ResourceRow) {
     return {
       wh: 'US Warehouse',
       detail: order.labelPdfUrl
-        ? 'Courier label PDF with US — pack & send to customer'
+        ? 'Label PDF ready — print, pack & dispatch to customer'
         : 'Stock / order is with the US Warehouse',
       tone: 'success' as const,
-      step: 'US: Pack & send (label already from India)',
+      step: 'US: Print label → Pack → Dispatch to customer',
     }
   }
   if (sc === 'US_STOCK') {
@@ -229,18 +232,13 @@ export function Orders() {
 
   const roleScoped = useMemo(() => {
     if (role === 'super_admin' || role === 'finance') return orders
-    // US only packs/sends orders in their bucket (Scenario A after label PDF)
+    // US bucket only — after India sends courier label PDF
     if (role === 'usa_wh') return orders.filter(inUsQueue)
-    // India is the hub: own queue + track labels sent to US + direct-to-customer ships
+    // India queue only — once order moves to US manager, drop it from India list
     return orders.filter(
       (o) =>
         inIndiaQueue(o) ||
-        Boolean(o.labelSentToUs) ||
-        Boolean(o.barcodeGenerated) ||
-        Boolean(o.dispatchedDirectToCustomer) ||
-        Boolean(o.awb) ||
-        String(o.status || '').toLowerCase().includes('in process') ||
-        ['INDIA_SHIP', 'MAKE', 'US_STOCK'].includes(String(o.fulfillmentScenario || '')),
+        String(o.status || '').toLowerCase().includes('in process'),
     )
   }, [orders, role])
 
@@ -418,11 +416,11 @@ export function Orders() {
         <p className="font-bold">Client SOP — press the primary button on each order</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[13px] text-indigo-900/90 dark:text-indigo-100/90">
           <li>
-            <strong>A · US stock</strong> → Send courier label to US (Amazon/Shopify platform label +
-            PDF) → US packs &amp; sends. India keeps history &amp; tracks.
+            <strong>A · US stock</strong> → Send courier label to US → status <em>Ready to Pack</em> →
+            leaves India list → US prints label → pack → dispatch to customer.
           </li>
           <li>
-            <strong>B · India stock</strong> → Weight + bill → Generate courier label (direct to
+            <strong>B · India stock</strong> → Weight → live courier rate + label (direct to
             customer) → Pack → Dispatch (dim weight + pics). Not via US Warehouse.
           </li>
           <li>
@@ -655,13 +653,6 @@ export function Orders() {
                             onClick={() => {
                               setShipOrder(order)
                               setShipWeight(String(order.shipWeightKg || '5'))
-                              setShipPrice(
-                                order.shipPrice != null
-                                  ? String(order.shipPrice)
-                                  : order.shippingCostAct != null
-                                    ? String(order.shippingCostAct)
-                                    : '',
-                              )
                               setShipLen(order.shipLengthCm != null ? String(order.shipLengthCm) : '')
                               setShipWid(order.shipWidthCm != null ? String(order.shipWidthCm) : '')
                               setShipHt(order.shipHeightCm != null ? String(order.shipHeightCm) : '')
@@ -669,7 +660,7 @@ export function Orders() {
                             }}
                           >
                             <Truck className="h-3.5 w-3.5" />
-                            Prep ship to customer (weight + bill)
+                            Prep ship to customer (weight)
                           </Button>
                         ) : null}
                         {showMake ? (
@@ -1095,14 +1086,13 @@ export function Orders() {
             </Button>
             <Button
               variant="primary"
-              disabled={!!busyAction || !Number(shipWeight) || shipPrice === ''}
+              disabled={!!busyAction || !Number(shipWeight)}
               onClick={async () => {
                 if (!shipOrder) return
                 const oid = String(shipOrder.orderId)
                 await runAction(`ship-${oid}`, () =>
                   api.fulfillment.shipIndiaToCustomer(oid, {
                     weightKg: Number(shipWeight),
-                    shipPrice: Number(shipPrice),
                     lengthCm: shipLen ? Number(shipLen) : undefined,
                     widthCm: shipWid ? Number(shipWid) : undefined,
                     heightCm: shipHt ? Number(shipHt) : undefined,
@@ -1112,20 +1102,19 @@ export function Orders() {
                 shipStreamRef.current?.getTracks().forEach((t) => t.stop())
                 setShipOrder(null)
                 setShipPhoto(null)
-                setShipPrice('')
                 navigate(`/shipping?orderId=${encodeURIComponent(oid)}`)
               }}
             >
-              <Truck className="h-3.5 w-3.5" /> Save bill & open courier label
+              <Truck className="h-3.5 w-3.5" /> Save weight & get live courier rate
             </Button>
           </>
         }
       >
         <div className="space-y-3 text-sm">
           <p className="text-[var(--text-muted)]">
-            India ships <strong>direct to the US customer</strong> (not to US Warehouse). Save{' '}
-            <strong>weight</strong>, courier <strong>rate / total bill</strong> (for shipping audit),
-            optional dims, then buy the courier label with customer address.
+            India ships <strong>direct to the US customer</strong>. Enter <strong>weight</strong>{' '}
+            (optional dims/photo). Next screen: Shipping Desk will pull the{' '}
+            <strong>live courier rate by weight</strong> — no manual price.
           </p>
           <label className="block text-xs font-semibold text-[var(--text-main)]">
             Package weight (kg) *
@@ -1135,18 +1124,6 @@ export function Orders() {
               step="0.1"
               value={shipWeight}
               onChange={(e) => setShipWeight(e.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
-            />
-          </label>
-          <label className="block text-xs font-semibold text-[var(--text-main)]">
-            Courier rate / total bill *
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={shipPrice}
-              onChange={(e) => setShipPrice(e.target.value)}
-              placeholder="Quoted rate saved for shipping audit"
               className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
             />
           </label>

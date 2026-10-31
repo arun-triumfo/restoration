@@ -314,7 +314,6 @@ export const api = {
       orderId: string,
       extras?: {
         weightKg: number
-        shipPrice: number
         photoDataUrl?: string
         lengthCm?: number
         widthCm?: number
@@ -329,7 +328,6 @@ export const api = {
           body: JSON.stringify({
             orderId,
             weightKg: extras?.weightKg,
-            shipPrice: extras?.shipPrice,
             photoDataUrl: extras?.photoDataUrl,
             lengthCm: extras?.lengthCm,
             widthCm: extras?.widthCm,
@@ -342,7 +340,6 @@ export const api = {
       orderId: string,
       extras?: {
         weightKg: number
-        shipPrice: number
         photoDataUrl?: string
         lengthCm?: number
         widthCm?: number
