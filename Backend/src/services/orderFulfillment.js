@@ -361,7 +361,7 @@ export function applyUsReceive(order) {
   }
 }
 
-/** Manufacturing complete (C) → treat like India direct ship (B) */
+/** Manufacturing complete (C) → treat like India direct ship (B). Same Orders screen; next button = Prep ship. */
 export function applyProductionComplete(order) {
   const etaDone = new Date().toISOString().slice(0, 10)
   return {
@@ -369,7 +369,7 @@ export function applyProductionComplete(order) {
       status: 'Pending Allocation',
       fulfillmentScenario: SCENARIO.INDIA_SHIP,
       mtoNeeded: false,
-      stockAllocation: 'Ready at India Warehouse — ship direct to customer',
+      stockAllocation: 'Made & ready at India — Prep ship to customer (weight)',
       fulfillmentWh: 'India Warehouse',
       stockAt: 'India Warehouse',
       queueOwner: 'india_wh',
@@ -377,7 +377,7 @@ export function applyProductionComplete(order) {
       history: pushHistory(
         order,
         'Mark ready (made)',
-        'Item ready at India Warehouse. Next: same as Scenario B — buy courier label → pack → dispatch direct to customer.',
+        'Manufacturing done. Rug now counted at India Warehouse. Same Orders list — next click: Prep ship to customer (weight) → live courier label → Pack → Dispatch to customer.',
       ),
     },
   }

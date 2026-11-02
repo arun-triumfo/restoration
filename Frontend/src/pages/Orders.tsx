@@ -167,7 +167,7 @@ function locationInfo(order: ResourceRow) {
     tone: 'purple' as const,
     step:
       sc === 'INDIA_SHIP'
-        ? 'Weight + bill → courier label → pack → dispatch to customer'
+        ? 'Prep ship (weight) → live courier label → pack → dispatch to customer'
         : 'Follow the primary button on the right',
   }
 }
@@ -424,7 +424,7 @@ export function Orders() {
     try {
       setBusyAction(key)
       const res = await fn()
-      await refresh('orders')
+      await refresh()
       pushToast(res.message || 'Done', 'success')
     } catch (err) {
       pushToast(
@@ -479,7 +479,8 @@ export function Orders() {
             customer) → Pack → Dispatch (dim weight + pics). Not via US Warehouse.
           </li>
           <li>
-            <strong>C · No stock</strong> → Mark ready → then same as B.
+            <strong>C · No stock / MTO</strong> → Mark ready (same Orders screen) → then same as B
+            (Prep ship → label → pack → dispatch). Does not open a new page.
           </li>
           <li>
             <strong>D · Returns</strong> → India WH Returns menu → Buy return label PDF (platform).

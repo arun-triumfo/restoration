@@ -345,12 +345,69 @@ export async function productionComplete(req, res) {
     const order = await loadOrder(orderId, tid)
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' })
 
+    if (String(order.status || '') !== 'In Process' && order.fulfillmentScenario !== SCENARIO.MAKE) {
+      return res.status(409).json({
+        success: false,
+        message: `Order is already ${order.status || 'not In Process'}. Look for “Prep ship to customer” on this row.`,
+      })
+    }
+
     const result = applyProductionComplete(order)
     const data = await patchOrder(orderId, tid, result.patch)
+
+    // Rug now exists at India WH — bump available stock so Orders inventory line updates
+    const qty = Math.max(1, Number(order.qty) || 1)
+    try {
+      const Sku = getResourceModel('skus', 'sku', true)
+      const skuDoc = await Sku.findOne({
+        $and: [tenantFilter(tid), { sku: String(order.sku || '') }],
+      }).lean()
+      if (skuDoc) {
+        const stock = skuDoc.stock || {}
+        const india = Number(stock.indiaAvailable ?? skuDoc.indiaAvailable ?? 0) + qty
+        await Sku.findOneAndUpdate(
+          { $and: [tenantFilter(tid), { sku: String(order.sku) }] },
+          {
+            $set: {
+              'stock.indiaAvailable': india,
+              indiaAvailable: india,
+            },
+          },
+        )
+      }
+    } catch {
+      /* non-fatal */
+    }
+
+    // Linked MTO job → Ready
+    try {
+      const Mto = getResourceModel('mto', 'id', true)
+      await Mto.updateMany(
+        {
+          $and: [
+            tenantFilter(tid),
+            { $or: [{ orderId }, { id: `MTO-${orderId}` }] },
+          ],
+        },
+        {
+          $set: {
+            stage: 'Ready at India WH',
+            status: 'Ready',
+            pendingQty: 0,
+            completedAt: new Date().toISOString(),
+          },
+        },
+      )
+    } catch {
+      /* non-fatal */
+    }
+
     res.json({
       success: true,
       data,
-      message: 'Marked ready — continue Scenario B: label → pack → dispatch to customer',
+      message:
+        'Marked ready — still on Orders. Next on this same row: Prep ship to customer (weight) → courier label → Pack → Dispatch.',
+      nextStep: 'prep_ship',
     })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })

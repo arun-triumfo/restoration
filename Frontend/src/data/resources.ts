@@ -537,7 +537,7 @@ export const RESOURCE_META: ResourceMeta[] = [
     idField: 'loomId',
     label: 'Looms',
     title: 'Loom Masters',
-    subtitle: 'Weaving capacity and craftsmen',
+    subtitle: 'Weaving capacity — active job must match a real MTO order (no dummy jobs)',
     path: '/looms',
     columns: [
       col('loomId', 'Loom ID'),
@@ -546,7 +546,11 @@ export const RESOURCE_META: ResourceMeta[] = [
       col('loomType', 'Type'),
       col('maxWidthFt', 'Max Width ft', { type: 'number' }),
       col('masterWeaver', 'Master Weaver'),
-      col('craftGrade', 'Grade'),
+      col('activeJobId', 'Active MTO job'),
+      col('orderId', 'Order'),
+      col('sku', 'SKU'),
+      col('status', 'Status', { format: 'badge' }),
+      col('craftGrade', 'Grade', { table: false }),
     ],
   },
   {
