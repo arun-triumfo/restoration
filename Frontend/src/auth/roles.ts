@@ -25,6 +25,7 @@ export function normalizeRoleCode(roleOrCode: string | undefined): RoleCode {
   return 'india_wh'
 }
 
+/** Full menus restored (not trimmed) */
 export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
   super_admin: ['*'],
   india_wh: [
@@ -48,6 +49,7 @@ export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
     '/warehouse-analytics',
     '/returns',
     '/courier-audit',
+    '/profitability',
     '/alerts',
     '/billing',
   ],
@@ -97,7 +99,6 @@ export function canAccessPath(
   return planAllowsPath(tenant?.modules, tenant?.plan, path)
 }
 
-/** All Restoration demo logins use @restoration.com */
 export const DEMO_ACCOUNTS = [
   { email: 'admin@restoration.com', role: 'Super Admin', roleCode: 'super_admin' as RoleCode },
   {

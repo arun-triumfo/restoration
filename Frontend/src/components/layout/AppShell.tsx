@@ -12,7 +12,7 @@ export function AppShell() {
       <div className="relative flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1600px] p-3 sm:p-4 lg:p-6">
+          <div className="mx-auto w-full max-w-[1600px] px-2 py-3 sm:p-4 lg:p-6">
             <Outlet />
           </div>
         </main>

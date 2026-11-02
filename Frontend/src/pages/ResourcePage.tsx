@@ -226,7 +226,7 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
       ) : null}
 
       <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
-        <div className="flex flex-col gap-3 border-b border-[var(--border-main)] p-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 border-b border-[var(--border-main)] p-3 sm:flex-row sm:items-center sm:p-4">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
@@ -245,8 +245,8 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[900px] w-full text-left text-sm">
+        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 sm:mx-0 sm:px-0">
+          <table className="w-full min-w-[640px] text-left text-sm sm:min-w-[900px]">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
               <tr>
                 {tableCols.map((c) => (

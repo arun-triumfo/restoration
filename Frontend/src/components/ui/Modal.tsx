@@ -28,33 +28,35 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
     >
       <div
-        className={`w-full rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-xl ${
-          size === 'lg' ? 'max-w-2xl' : 'max-w-lg'
+        className={`flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-xl sm:max-h-[90vh] sm:rounded-2xl ${
+          size === 'lg' ? 'sm:max-w-2xl' : 'sm:max-w-lg'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-[var(--border-main)] px-5 py-4">
-          <div>
+        <div className="flex shrink-0 items-start justify-between border-b border-[var(--border-main)] px-4 py-3 sm:px-5 sm:py-4">
+          <div className="min-w-0 pr-2">
             {badge ? (
               <Badge tone={badgeTone} className="mb-2">
                 {badge}
               </Badge>
             ) : null}
-            <h3 className="text-base font-bold text-[var(--text-main)]">{title}</h3>
+            <h3 className="text-sm font-bold text-[var(--text-main)] sm:text-base">{title}</h3>
           </div>
           <Button variant="ghost" size="sm" aria-label="Close modal" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="px-5 py-4 text-sm text-[var(--text-muted)]">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 text-sm text-[var(--text-muted)] sm:px-5 sm:py-4">
+          {children}
+        </div>
         {footer ? (
-          <div className="flex justify-end gap-2 border-t border-[var(--border-main)] px-5 py-3">
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--border-main)] px-4 py-3 sm:px-5">
             {footer}
           </div>
         ) : null}

@@ -5,7 +5,9 @@ import {
   isOfflineChannel,
   pushHistory,
   routeNewOrderPayload,
+  SCENARIO,
 } from '../services/orderFulfillment.js'
+import { ensureMtoJobForOrder } from '../services/mtoMill.js'
 
 function modelFor(resource) {
   const meta = RESOURCES[resource]
@@ -177,6 +179,21 @@ export function createResource(resource) {
       const created = await Model.create(payload)
       const obj = created.toObject ? created.toObject() : created
       delete obj.passwordHash
+
+      // Option B: MAKE orders auto-open MTO job + assign loom
+      if (resource === 'orders' && (obj.fulfillmentScenario === SCENARIO.MAKE || obj.status === 'In Process')) {
+        try {
+          const job = await ensureMtoJobForOrder(obj, tenantIdOf(req))
+          if (job) {
+            obj.mtoJobId = job.id
+            obj.mtoStage = job.stageKey || 'Queued'
+            obj.mtoStatus = job.status
+          }
+        } catch {
+          /* non-fatal */
+        }
+      }
+
       res.status(201).json({ success: true, data: obj })
     } catch (err) {
       res.status(500).json({ success: false, message: err.message })

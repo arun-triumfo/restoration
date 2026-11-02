@@ -1,8 +1,7 @@
 import type { NavSection } from '../types'
 
 /**
- * Sidebar: daily ops flow on top, master/setup screens at the bottom.
- * Matches Restoration fulfillment path (Orders → Stock → Make → Ship → Finance).
+ * Full sidebar (restored) — daily ops on top, masters at bottom.
  */
 export const NAV_SECTIONS: NavSection[] = [
   {

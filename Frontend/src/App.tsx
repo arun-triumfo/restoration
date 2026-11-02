@@ -15,6 +15,7 @@ import { HomeRoute } from './pages/HomeRoute'
 import { IntegrationsHub } from './pages/IntegrationsHub'
 import { Inventory } from './pages/Inventory'
 import { Login } from './pages/Login'
+import { MtoJobs } from './pages/MtoJobs'
 import { Orders } from './pages/Orders'
 import { PackingStation } from './pages/PackingStation'
 import { ResourcePage } from './pages/ResourcePage'
@@ -40,6 +41,7 @@ const NATIVE_PATHS = new Set([
   '/warehouse-analytics',
   '/orders',
   '/inventory',
+  '/mto',
 ])
 
 /** Prefer live Mongo CRUD tables over wireframe for client add/edit/delete */
@@ -167,6 +169,14 @@ export default function App() {
                 element={
                   <RequirePath>
                     <Inventory />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="mto"
+                element={
+                  <RequirePath>
+                    <MtoJobs />
                   </RequirePath>
                 }
               />

@@ -11,6 +11,7 @@ import {
 } from '../services/orderFulfillment.js'
 import { buyPlatformOutboundLabel } from '../services/platformLabels.js'
 import { notifyChannelTracking as notifyTracking } from '../services/shippingAssign.js'
+import { assertMtoReadyForMarkReady, ensureMtoJobForOrder } from '../services/mtoMill.js'
 
 function tenantIdOf(req) {
   return req.user?.tenantId || DEFAULT_TENANT_ID
@@ -91,7 +92,16 @@ export async function bulkReRoute(req, res) {
     for (const order of orders) {
       const patch = await reRouteOrder(order, tid)
       const doc = await patchOrder(order.orderId, tid, patch)
-      if (doc) updated.push(doc)
+      if (doc) {
+        if (doc.fulfillmentScenario === SCENARIO.MAKE || doc.status === 'In Process') {
+          try {
+            await ensureMtoJobForOrder(doc, tid)
+          } catch {
+            /* ignore */
+          }
+        }
+        updated.push(doc)
+      }
     }
 
     res.json({
@@ -352,6 +362,17 @@ export async function productionComplete(req, res) {
       })
     }
 
+    // Option B: mill must reach Ready on MTO Jobs before Mark ready
+    const millGate = await assertMtoReadyForMarkReady(order, tid)
+    if (millGate.error) {
+      return res.status(409).json({
+        success: false,
+        message: millGate.error,
+        mto: millGate.job || null,
+        nextStep: 'mto_advance',
+      })
+    }
+
     const result = applyProductionComplete(order)
     const data = await patchOrder(orderId, tid, result.patch)
 
@@ -379,24 +400,39 @@ export async function productionComplete(req, res) {
       /* non-fatal */
     }
 
-    // Linked MTO job → Ready
+    // Always upsert MTO job so /mto page shows this order as Ready
     try {
       const Mto = getResourceModel('mto', 'id', true)
-      await Mto.updateMany(
-        {
-          $and: [
-            tenantFilter(tid),
-            { $or: [{ orderId }, { id: `MTO-${orderId}` }] },
-          ],
-        },
+      const Sku = getResourceModel('skus', 'sku', true)
+      const skuDoc = await Sku.findOne({
+        $and: [tenantFilter(tid), { sku: String(order.sku || '') }],
+      }).lean()
+      const mtoId = `MTO-${orderId}`
+      await Mto.findOneAndUpdate(
+        { id: mtoId },
         {
           $set: {
+            id: mtoId,
+            orderId,
+            sku: order.sku,
+            title: skuDoc?.title || order.sku,
             stage: 'Ready at India WH',
             status: 'Ready',
+            qty: qty,
             pendingQty: 0,
+            expectedReadyDate: order.expectedWarehouseDeliveryDate || null,
             completedAt: new Date().toISOString(),
+            tenantId: tid,
           },
         },
+        { upsert: true },
+      )
+
+      // Free loom that was weaving this job
+      const Loom = getResourceModel('looms', 'loomId', true)
+      await Loom.updateMany(
+        { $or: [{ activeJobId: mtoId }, { orderId }] },
+        { $set: { activeJobId: null, orderId: null, status: 'Idle / Available' } },
       )
     } catch {
       /* non-fatal */
@@ -406,7 +442,7 @@ export async function productionComplete(req, res) {
       success: true,
       data,
       message:
-        'Marked ready — still on Orders. Next on this same row: Prep ship to customer (weight) → courier label → Pack → Dispatch.',
+        'Marked ready ✓ Same Orders row ab “Prep ship to customer” dikhayega. MTO Jobs me bhi Ready dikhega.',
       nextStep: 'prep_ship',
     })
   } catch (err) {

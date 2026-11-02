@@ -194,13 +194,15 @@ export const RESOURCE_META: ResourceMeta[] = [
     idField: 'id',
     label: 'MTO Jobs',
     title: 'Make-to-Order',
-    subtitle: 'Loom jobs and production stages',
+    subtitle:
+      'Only real order-linked jobs. In Process = weaving · Ready = Mark ready done → go Orders → Prep ship',
     path: '/mto',
     columns: [
       col('id', 'Job ID'),
       col('orderId', 'Order'),
       col('sku', 'SKU'),
       col('title', 'Title', { type: 'textarea' }),
+      col('status', 'Status', { format: 'badge' }),
       col('stage', 'Stage', { format: 'badge' }),
       col('qty', 'Qty', { type: 'number' }),
       col('pendingQty', 'Pending', { type: 'number' }),

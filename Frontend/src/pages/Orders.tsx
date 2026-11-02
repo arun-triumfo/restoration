@@ -126,7 +126,7 @@ function locationInfo(order: ResourceRow) {
       wh: 'Not in stock',
       detail: 'Making at India side — not in either warehouse yet',
       tone: 'purple' as const,
-      step: 'When ready: Mark ready → then ship direct to customer',
+      step: 'MTO Jobs: Queued→Weaving→QC→Ready, then Mark ready here',
     }
   }
   if (
@@ -187,6 +187,7 @@ export function Orders() {
   const { list, create, update, remove, loading, error, refresh } = useData()
   const orders = list('orders')
   const skus = list('skus')
+  const mtoJobs = list('mto')
   const role = normalizeRoleCode(String(user?.roleCode || ''))
 
   const skuMap = useMemo(() => {
@@ -206,6 +207,28 @@ export function Orders() {
     }
     return map
   }, [skus])
+
+  const mtoByOrder = useMemo(() => {
+    const map = new Map<string, ResourceRow>()
+    for (const j of mtoJobs) {
+      const oid = String(j.orderId || '')
+      if (oid) map.set(oid, j)
+    }
+    return map
+  }, [mtoJobs])
+
+  function mtoIsReady(orderId: string) {
+    const j = mtoByOrder.get(orderId)
+    if (!j) return false
+    const stage = String(j.stageKey || j.stage || '')
+    return String(j.status) === 'Ready' || /ready/i.test(stage)
+  }
+
+  function mtoLabel(orderId: string) {
+    const j = mtoByOrder.get(orderId)
+    if (!j) return 'No MTO job — open MTO Jobs → Sync'
+    return String(j.stage || j.stageKey || j.status || 'Queued')
+  }
 
   const [tab, setTab] = useState<OrderTab>('pending')
   const [query, setQuery] = useState('')
@@ -479,8 +502,12 @@ export function Orders() {
             customer) → Pack → Dispatch (dim weight + pics). Not via US Warehouse.
           </li>
           <li>
-            <strong>C · No stock / MTO</strong> → Mark ready (same Orders screen) → then same as B
-            (Prep ship → label → pack → dispatch). Does not open a new page.
+            <strong>C · No stock / MTO</strong> →{' '}
+            <Link to="/mto" className="underline">
+              MTO Jobs
+            </Link>{' '}
+            stages Queued→Weaving→QC→Ready → then Orders <em>Mark ready</em> → Prep ship → label →
+            pack → dispatch.
           </li>
           <li>
             <strong>D · Returns</strong> → India WH Returns menu → Buy return label PDF (platform).
@@ -515,7 +542,7 @@ export function Orders() {
       </div>
 
       <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
-        <div className="flex flex-col gap-3 border-b border-[var(--border-main)] p-4 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-3 border-b border-[var(--border-main)] p-3 sm:p-4 lg:flex-row lg:items-center">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search orders</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
@@ -566,8 +593,8 @@ export function Orders() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[1180px] w-full text-left text-sm">
+        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 sm:mx-0 sm:px-0">
+          <table className="w-full min-w-[920px] text-left text-sm md:min-w-[1100px]">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
               <tr>
                 <th className="px-4 py-3 font-semibold">Product (from inventory)</th>
@@ -605,7 +632,9 @@ export function Orders() {
                   Boolean(order.awb || order.labelGenerated) &&
                   !order.dispatchedDirectToCustomer &&
                   st.includes('Packed')
-                const showMake = canIndiaAct && st === 'In Process'
+                const millReady = mtoIsReady(oid)
+                const showMake = canIndiaAct && st === 'In Process' && millReady
+                const showMillWait = canIndiaAct && st === 'In Process' && !millReady
                 const showReceive =
                   canUsAct && st === 'In Transit' && !order.dispatchedDirectToCustomer && scenario !== 'INDIA_SHIP'
 
@@ -720,16 +749,31 @@ export function Orders() {
                             Prep ship to customer (weight)
                           </Button>
                         ) : null}
+                        {showMillWait ? (
+                          <Link
+                            to="/mto"
+                            className="inline-flex h-8 items-center justify-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 text-xs font-semibold text-amber-950 no-underline hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100"
+                          >
+                            <Package className="h-3.5 w-3.5" />
+                            Mill: {mtoLabel(oid)} — open MTO Jobs
+                          </Link>
+                        ) : null}
                         {showMake ? (
                           <Button
-                            variant="secondary"
+                            variant="primary"
                             size="sm"
                             className="justify-start"
                             disabled={!!busyAction}
                             onClick={() =>
-                              runAction(`prod-${oid}`, () =>
-                                api.fulfillment.productionComplete(oid),
-                              )
+                              runAction(`prod-${oid}`, async () => {
+                                const res = await api.fulfillment.productionComplete(oid)
+                                try {
+                                  await refresh()
+                                } catch {
+                                  /* ignore */
+                                }
+                                return res
+                              })
                             }
                           >
                             <Package className="h-3.5 w-3.5" />

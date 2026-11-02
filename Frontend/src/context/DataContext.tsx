@@ -32,6 +32,8 @@ const DataContext = createContext<DataContextValue | null>(null)
 const PRIORITY_KEYS = [
   'skus',
   'orders',
+  'mto',
+  'looms',
   'alerts',
   'automations',
   'warehouses',

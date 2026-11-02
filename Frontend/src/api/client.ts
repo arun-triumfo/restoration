@@ -392,6 +392,25 @@ export const api = {
       ),
   },
 
+  mto: {
+    advance: (mtoId: string) =>
+      request<{
+        success: boolean
+        data: ResourceRow
+        message?: string
+        from?: string
+        to?: string
+      }>('/mto/actions/advance', {
+        method: 'POST',
+        body: JSON.stringify({ mtoId }),
+      }),
+    ensureJobs: () =>
+      request<{ success: boolean; count: number; message?: string; created?: string[] }>(
+        '/mto/actions/ensure-jobs',
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
+  },
+
   returnsApi: {
     buyReturnLabel: (returnId: string) =>
       request<{

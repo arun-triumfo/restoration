@@ -38,6 +38,7 @@ import {
   usReceive,
 } from './controllers/fulfillmentController.js'
 import { buyReturnLabel, usReceiveReturn } from './controllers/returnsController.js'
+import { advanceStage, ensureJobs } from './controllers/mtoController.js'
 import { RESOURCES } from './resources.js'
 
 dotenv.config()
@@ -184,6 +185,20 @@ app.post(
   requireActiveBilling,
   requirePermission('orders', 'write'),
   productionComplete,
+)
+app.post(
+  '/api/mto/actions/advance',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('mto', 'write'),
+  advanceStage,
+)
+app.post(
+  '/api/mto/actions/ensure-jobs',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('mto', 'write'),
+  ensureJobs,
 )
 app.post(
   '/api/returns/actions/buy-return-label',
