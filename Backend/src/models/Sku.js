@@ -23,6 +23,18 @@ const mappingsSchema = new mongoose.Schema(
   { _id: false },
 )
 
+const binLocationSchema = new mongoose.Schema(
+  {
+    zone: { type: String, default: '' },
+    aisle: { type: String, default: '' },
+    rack: { type: String, default: '' },
+    bin: { type: String, default: '' },
+    note: { type: String, default: '' },
+    photoUrl: { type: String, default: '' },
+  },
+  { _id: false },
+)
+
 const skuSchema = new mongoose.Schema(
   {
     sku: { type: String, required: true, unique: true, trim: true },
@@ -45,6 +57,10 @@ const skuSchema = new mongoose.Schema(
     allocatedLandedFreightUSD: Number,
     stock: { type: stockSchema, default: () => ({}) },
     mappings: { type: mappingsSchema, default: () => ({}) },
+    locations: {
+      india: { type: binLocationSchema, default: () => ({}) },
+      usa: { type: binLocationSchema, default: () => ({}) },
+    },
     barcode: String,
     imageUrl: String,
   },

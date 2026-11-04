@@ -67,6 +67,14 @@ export function Dashboard() {
     const gmv = orders.reduce((sum, o) => sum + Number(o.totalOrderUSD || 0), 0)
     const aov = orders.length ? gmv / orders.length : 0
     const orderQty = orders.reduce((sum, o) => sum + Number(o.qty || 0), 0)
+    const indiaQueue = orders.filter(
+      (o) =>
+        String(o.queueOwner || 'india_wh') === 'india_wh' ||
+        String(o.status || '').toLowerCase().includes('in process'),
+    ).length
+    const usQueue = orders.filter(
+      (o) => String(o.queueOwner || '') === 'usa_wh' || Boolean(o.labelSentToUs),
+    ).length
 
     const lastMonth = monthly[0] as Record<string, number> | undefined
     const inflows =
@@ -77,7 +85,20 @@ export function Dashboard() {
       Number(lastMonth?.poPayoutsUSD || 0)
     const net = inflows - outflows
 
-    return { stockTotal, india, usa, transit, fba, gmv, aov, orderQty, net, inflows }
+    return {
+      stockTotal,
+      india,
+      usa,
+      transit,
+      fba,
+      gmv,
+      aov,
+      orderQty,
+      net,
+      inflows,
+      indiaQueue,
+      usQueue,
+    }
   }, [skus, orders, monthly])
 
   const revenueChart = useMemo(() => {
@@ -159,6 +180,45 @@ export function Dashboard() {
           badge={<Badge tone="purple">Finance</Badge>}
           detail="Latest monthly_financials period"
         />
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Link
+          to="/orders?bucket=all"
+          className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 no-underline shadow-[var(--shadow-sm)] hover:border-indigo-400"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-dim)]">
+            All orders
+          </p>
+          <p className="mt-1 font-mono text-2xl font-extrabold text-[var(--text-main)]">
+            {orders.length}
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">India + US buckets — admin sees everything</p>
+        </Link>
+        <Link
+          to="/orders?bucket=india"
+          className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 no-underline shadow-[var(--shadow-sm)] hover:border-indigo-400"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-dim)]">
+            India queue
+          </p>
+          <p className="mt-1 font-mono text-2xl font-extrabold text-[var(--text-main)]">
+            {metrics.indiaQueue}
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">Still with India Warehouse / mill</p>
+        </Link>
+        <Link
+          to="/orders?bucket=usa"
+          className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 no-underline shadow-[var(--shadow-sm)] hover:border-indigo-400"
+        >
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-dim)]">
+            Assigned to US
+          </p>
+          <p className="mt-1 font-mono text-2xl font-extrabold text-[var(--text-main)]">
+            {metrics.usQueue}
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">India sent label → US manager bucket</p>
+        </Link>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

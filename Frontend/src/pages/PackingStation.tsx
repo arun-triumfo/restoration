@@ -176,6 +176,13 @@ export function PackingStation() {
                 <span className="text-[var(--text-muted)]">
                   {String(o.sku || '')} · {String(o.status || '')}
                 </span>
+                {o.pickPath ? (
+                  <span className="mt-0.5 block text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                    Pick: {String(o.pickPath)}
+                    {o.pickRack ? ` · Rack ${String(o.pickRack)}` : ''}
+                    {o.pickBin ? ` / Bin ${String(o.pickBin)}` : ''}
+                  </span>
+                ) : null}
               </button>
             </li>
           ))}

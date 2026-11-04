@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { Button } from '../components/ui/Button'
 import { useData } from '../context/DataContext'
+import { firstDate, inDateRange } from '../lib/dateRange'
 
 type Rate = { service: string; name: string; days: number; amount: number; currency: string }
 type Shipment = Record<string, unknown> & {
@@ -13,6 +14,9 @@ type Shipment = Record<string, unknown> & {
   orderId?: string
   legLabel?: string
   shipToName?: string
+  createdAt?: string
+  updatedAt?: string
+  shippedAt?: string
 }
 
 function uploadsUrl(path?: string) {
@@ -45,6 +49,10 @@ export function ShippingDesk() {
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [shipQuery, setShipQuery] = useState('')
+  const [shipStatus, setShipStatus] = useState('all')
+  const [shipDateFrom, setShipDateFrom] = useState('')
+  const [shipDateTo, setShipDateTo] = useState('')
 
   const pendingOrders = useMemo(
     () =>
@@ -55,11 +63,32 @@ export function ShippingDesk() {
           st === 'In Process' ||
           st === 'In Transit' ||
           st.includes('Packed') ||
+          st === 'Ready to Pack' ||
+          st === 'Label Created' ||
           !o.awb
         )
       }),
     [orders],
   )
+
+  const filteredShipments = useMemo(() => {
+    const q = shipQuery.trim().toLowerCase()
+    return shipments.filter((s) => {
+      const st = String(s.status || '')
+      const hay = [s.awb, s.orderId, s.legLabel, s.shipToName, s.carrier, s.status]
+        .map((x) => String(x || '').toLowerCase())
+        .join(' ')
+      const matchesQuery = !q || hay.includes(q)
+      const matchesStatus =
+        shipStatus === 'all' ||
+        (shipStatus === 'label' && /label/i.test(st)) ||
+        (shipStatus === 'transit' && /transit/i.test(st)) ||
+        (shipStatus === 'delivered' && /deliver/i.test(st)) ||
+        st.toLowerCase().includes(shipStatus)
+      const when = firstDate(s.createdAt, s.updatedAt, s.shippedAt)
+      return matchesQuery && matchesStatus && inDateRange(when, shipDateFrom, shipDateTo)
+    })
+  }, [shipments, shipQuery, shipStatus, shipDateFrom, shipDateTo])
 
   const loadShipments = useCallback(async () => {
     try {
@@ -356,8 +385,51 @@ export function ShippingDesk() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)]">
-        <div className="border-b border-[var(--border-subtle)] px-4 py-3 text-sm font-bold text-[var(--text-main)]">
-          Recent shipments ({shipments.length})
+        <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+          <div className="text-sm font-bold text-[var(--text-main)]">
+            Recent shipments ({filteredShipments.length}
+            {filteredShipments.length !== shipments.length ? ` of ${shipments.length}` : ''})
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <input
+              value={shipQuery}
+              onChange={(e) => setShipQuery(e.target.value)}
+              placeholder="Filter AWB, order, customer…"
+              className="h-9 min-w-[12rem] flex-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              aria-label="Filter shipments"
+            />
+            <select
+              value={shipStatus}
+              onChange={(e) => setShipStatus(e.target.value)}
+              className="h-9 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+              aria-label="Shipment status"
+            >
+              <option value="all">All statuses</option>
+              <option value="label">Label Created</option>
+              <option value="transit">In Transit</option>
+              <option value="delivered">Delivered</option>
+            </select>
+            <label className="flex h-9 items-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2 text-xs text-[var(--text-muted)]">
+              From
+              <input
+                type="date"
+                value={shipDateFrom}
+                onChange={(e) => setShipDateFrom(e.target.value)}
+                className="h-7 bg-transparent text-sm text-[var(--text-main)] outline-none"
+                aria-label="Shipment date from"
+              />
+            </label>
+            <label className="flex h-9 items-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2 text-xs text-[var(--text-muted)]">
+              To
+              <input
+                type="date"
+                value={shipDateTo}
+                onChange={(e) => setShipDateTo(e.target.value)}
+                className="h-7 bg-transparent text-sm text-[var(--text-main)] outline-none"
+                aria-label="Shipment date to"
+              />
+            </label>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -373,7 +445,17 @@ export function ShippingDesk() {
               </tr>
             </thead>
             <tbody>
-              {shipments.map((s) => (
+              {filteredShipments.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-3 py-8 text-center text-sm text-[var(--text-muted)]"
+                  >
+                    No shipments match these filters.
+                  </td>
+                </tr>
+              ) : null}
+              {filteredShipments.map((s) => (
                 <tr key={String(s.awb)} className="border-t border-[var(--border-subtle)]">
                   <td className="px-3 py-2 font-mono text-[12px] text-[var(--text-main)]">{s.awb}</td>
                   <td className="px-3 py-2 text-[var(--text-muted)]">{String(s.orderId || '—')}</td>

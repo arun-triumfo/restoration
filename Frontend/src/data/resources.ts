@@ -85,6 +85,8 @@ export const RESOURCE_META: ResourceMeta[] = [
       col('sellingPriceUSD', 'Price USD', { type: 'number', format: 'currency' }),
       col('barcode', 'Barcode', { table: false }),
       col('imageUrl', 'Image URL', { table: false }),
+      col('indiaRack', 'India rack', { table: false, form: false }),
+      col('usaRack', 'US rack', { table: false, form: false }),
     ],
   },
   {
@@ -134,7 +136,10 @@ export const RESOURCE_META: ResourceMeta[] = [
       col('city', 'City'),
       col('capacityCBM', 'Capacity CBM', { type: 'number' }),
       col('address', 'Address', { type: 'textarea', table: false }),
-      col('imageUrl', 'Photo URL (optional)', { table: false }),
+      col('imageUrl', 'Warehouse photo URL', { table: false }),
+      col('photo2Url', 'Warehouse photo 2 URL', { table: false }),
+      col('photo3Url', 'Warehouse photo 3 URL', { table: false }),
+      col('floorPlanUrl', 'Floor / rack map URL', { table: false }),
     ],
   },
   {

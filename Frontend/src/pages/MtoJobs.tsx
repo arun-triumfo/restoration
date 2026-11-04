@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { useApp } from '../context/AppContext'
 import { useData } from '../context/DataContext'
+import { firstDate, inDateRange } from '../lib/dateRange'
 
 const STAGES = ['Queued', 'Weaving', 'QC', 'Ready'] as const
 
@@ -43,17 +44,27 @@ export function MtoJobs() {
   const jobs = list('mto')
   const [busy, setBusy] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [stage, setStage] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const rows = [...jobs].sort((a, b) => String(a.orderId || '').localeCompare(String(b.orderId || '')))
-    if (!q) return rows
-    return rows.filter((r) =>
-      [r.orderId, r.sku, r.title, r.stage, r.status, r.loomId]
-        .map((x) => String(x || '').toLowerCase())
-        .some((s) => s.includes(q)),
-    )
-  }, [jobs, query])
+    const rows = [...jobs]
+      .filter((r) => {
+        const key = stageKeyOf(r)
+        const matchesQuery =
+          !q ||
+          [r.orderId, r.sku, r.title, r.stage, r.status, r.loomId]
+            .map((x) => String(x || '').toLowerCase())
+            .some((s) => s.includes(q))
+        const matchesStage = stage === 'all' || key === stage
+        const when = firstDate(r.expectedReadyDate, r.createdAt, r.updatedAt)
+        return matchesQuery && matchesStage && inDateRange(when, dateFrom, dateTo)
+      })
+      .sort((a, b) => String(a.orderId || '').localeCompare(String(b.orderId || '')))
+    return rows
+  }, [jobs, query, stage, dateFrom, dateTo])
 
   const advance = async (row: ResourceRow) => {
     const id = String(row.id || '')
@@ -120,15 +131,53 @@ export function MtoJobs() {
         </div>
       ) : null}
 
-      <label className="block">
-        <span className="sr-only">Search</span>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search order / SKU / loom…"
-          className="h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm outline-none focus:border-indigo-500 sm:max-w-md"
-        />
-      </label>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <label className="block min-w-0 flex-1 sm:max-w-md">
+          <span className="sr-only">Search</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search order / SKU / loom…"
+            className="h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm outline-none focus:border-indigo-500"
+          />
+        </label>
+        <select
+          value={stage}
+          onChange={(e) => setStage(e.target.value)}
+          className="h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+          aria-label="MTO status"
+        >
+          <option value="all">All statuses</option>
+          {STAGES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <label className="flex h-10 items-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2 text-xs text-[var(--text-muted)]">
+          From
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-8 bg-transparent text-sm text-[var(--text-main)] outline-none"
+            aria-label="MTO date from"
+          />
+        </label>
+        <label className="flex h-10 items-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2 text-xs text-[var(--text-muted)]">
+          To
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-8 bg-transparent text-sm text-[var(--text-main)] outline-none"
+            aria-label="MTO date to"
+          />
+        </label>
+        <span className="text-xs font-medium text-[var(--text-muted)]">
+          {loading ? 'Loading…' : `${filtered.length} jobs`}
+        </span>
+      </div>
 
       <div className="space-y-3">
         {filtered.map((row) => {

@@ -1,6 +1,8 @@
 import {
+  Camera,
   Download,
   Eye,
+  MapPin,
   MoveHorizontal,
   PackagePlus,
   Pencil,
@@ -10,15 +12,25 @@ import {
   Upload,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import type { ResourceRow } from '../api/client'
+import { api, ApiError, type ResourceRow } from '../api/client'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Pagination } from '../components/ui/Pagination'
 import { useApp } from '../context/AppContext'
 import { useData } from '../context/DataContext'
+import {
+  CSV_LOCATION_HEADERS,
+  flattenLocToForm,
+  locOf,
+  locationsFromCsv,
+  locationsFromForm,
+  mediaUrl,
+  pickPath,
+  type WhKey,
+} from '../lib/inventoryLocation'
 
-type StockTab = 'all' | 'lowStock' | 'india' | 'usa' | 'inTransit' | 'heritage' | 'boho'
+type StockTab = 'all' | 'pickup' | 'lowStock' | 'india' | 'usa' | 'inTransit' | 'heritage' | 'boho'
 
 type Stock = {
   indiaAvailable?: number
@@ -51,7 +63,7 @@ function getDaysOfCover(sku: ResourceRow): number {
   return Math.round(available / 1.8)
 }
 
-const FORM_FIELDS = [
+const PRODUCT_FIELDS = [
   'sku',
   'odetteSku',
   'title',
@@ -64,17 +76,48 @@ const FORM_FIELDS = [
   'weightKg',
   'barcode',
   'imageUrl',
+  'indiaAvailable',
+  'usaAvailable',
 ] as const
+
+const FIELD_LABELS: Record<string, string> = {
+  sku: 'SKU',
+  odetteSku: 'Odette SKU',
+  title: 'Title',
+  collection: 'Collection',
+  construction: 'Construction',
+  material: 'Material',
+  size: 'Size',
+  sellingPriceUSD: 'Selling price USD',
+  mfgCostUSD: 'Mfg cost USD',
+  weightKg: 'Weight kg',
+  barcode: 'Barcode',
+  imageUrl: 'Product image URL',
+  indiaAvailable: 'Qty India WH',
+  usaAvailable: 'Qty US WH',
+}
+
+async function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
 
 export function Inventory() {
   const { openModal, pushToast } = useApp()
   const { list, create, update, remove, loading, error } = useData()
   const skus = list('skus')
+  const warehouses = list('warehouses')
 
   const [tab, setTab] = useState<StockTab>('all')
   const [query, setQuery] = useState('')
   const [collection, setCollection] = useState('all')
   const [status, setStatus] = useState('all')
+  const [whFilter, setWhFilter] = useState<'all' | WhKey>('all')
+  const [rackFilter, setRackFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -83,29 +126,21 @@ export function Inventory() {
   const [deleteSku, setDeleteSku] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [pickSku, setPickSku] = useState<ResourceRow | null>(null)
+  const [photoBusy, setPhotoBusy] = useState<string | null>(null)
 
   const CSV_HEADERS = [
-    'sku',
-    'odetteSku',
-    'title',
-    'collection',
-    'construction',
-    'material',
-    'size',
-    'sellingPriceUSD',
-    'mfgCostUSD',
-    'weightKg',
-    'barcode',
-    'imageUrl',
+    ...PRODUCT_FIELDS.filter((k) => k !== 'indiaAvailable' && k !== 'usaAvailable'),
     'indiaAvailable',
     'usaAvailable',
-  ] as const
+    ...CSV_LOCATION_HEADERS,
+  ]
 
   const downloadTemplate = () => {
     const sample = [
       CSV_HEADERS.join(','),
-      'SKU-SAMPLE-001,,Sample Braided Jute Rug,Heritage,Flatweave,Jute,5x8,420,180,4.5,BC-SAMPLE-001,,10,0',
-      'SKU-SAMPLE-002,,Sample Wool Kilim,Boho,Handwoven,Wool,2.5x8,310,140,2.2,BC-SAMPLE-002,,5,0',
+      'SKU-SAMPLE-001,,Sample Braided Jute Rug,Heritage,Flatweave,Jute,5x8,420,180,4.5,BC-SAMPLE-001,,10,0,A,01,R-04,B-02,India floor left of wash bay,,C,02,R-11,B-06,US Edison aisle 2,',
+      'SKU-SAMPLE-002,,Sample Wool Kilim,Boho,Handwoven,Wool,2.5x8,310,140,2.2,BC-SAMPLE-002,,5,3,B,03,R-08,B-01,India mezzanine,,D,01,R-03,B-04,US rack near pack bench,',
     ].join('\n')
     const blob = new Blob([sample], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -114,7 +149,7 @@ export function Inventory() {
     a.download = 'rugos-inventory-bulk-template.csv'
     a.click()
     URL.revokeObjectURL(url)
-    pushToast('Template downloaded — fill rows and Bulk CSV Import', 'success')
+    pushToast('Template downloaded — include rack / aisle / bin so pickers can find stock', 'success')
   }
 
   const parseCsvLine = (line: string) => {
@@ -163,6 +198,9 @@ export function Inventory() {
         }
         const india = Number(row.indiaAvailable || 0) || 0
         const usa = Number(row.usaAvailable || 0) || 0
+        const existing = skus.find((s) => String(s.sku) === sku)
+        const incomingLoc = locationsFromCsv(row)
+        const prevLoc = (existing?.locations as Record<string, Record<string, string>>) || {}
         const payload: ResourceRow = {
           sku,
           odetteSku: row.odetteSku || '',
@@ -180,15 +218,18 @@ export function Inventory() {
           usaAvailable: usa,
           stock: {
             indiaAvailable: india,
-            indiaPacked: 0,
-            inTransit: 0,
+            indiaPacked: Number((existing?.stock as Stock)?.indiaPacked || 0),
+            inTransit: Number((existing?.stock as Stock)?.inTransit || 0),
             usaAvailable: usa,
-            usaReserved: 0,
-            fba: 0,
+            usaReserved: Number((existing?.stock as Stock)?.usaReserved || 0),
+            fba: Number((existing?.stock as Stock)?.fba || 0),
+          },
+          locations: {
+            india: { ...(prevLoc.india || {}), ...incomingLoc.india },
+            usa: { ...(prevLoc.usa || {}), ...incomingLoc.usa },
           },
         }
         try {
-          const existing = skus.find((s) => String(s.sku) === sku)
           if (existing) {
             await update('skus', sku, { ...existing, ...payload })
           } else {
@@ -207,6 +248,17 @@ export function Inventory() {
     }
   }
 
+  const rackOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const sku of skus) {
+      const i = locOf(sku, 'india').rack
+      const u = locOf(sku, 'usa').rack
+      if (i) set.add(`IN ${i}`)
+      if (u) set.add(`US ${u}`)
+    }
+    return [...set].sort()
+  }, [skus])
+
   const filtered = useMemo(() => {
     return skus.filter((sku) => {
       const q = query.trim().toLowerCase()
@@ -218,6 +270,12 @@ export function Inventory() {
       const coll = String(sku.collection || '')
       const s = stockOf(sku)
       const days = getDaysOfCover(sku)
+      const indiaLoc = locOf(sku, 'india')
+      const usaLoc = locOf(sku, 'usa')
+      const locHay = [indiaLoc, usaLoc]
+        .flatMap((l) => [l.zone, l.aisle, l.rack, l.bin, l.note])
+        .join(' ')
+        .toLowerCase()
 
       const matchesQuery =
         !q ||
@@ -225,12 +283,14 @@ export function Inventory() {
         title.toLowerCase().includes(q) ||
         construction.toLowerCase().includes(q) ||
         material.toLowerCase().includes(q) ||
-        barcode.includes(q)
+        barcode.includes(q) ||
+        locHay.includes(q)
 
       const matchesCollection = collection === 'all' || coll === collection
 
       const matchesTab =
         tab === 'all' ||
+        (tab === 'pickup' && (Number(s.indiaAvailable || 0) > 0 || Number(s.usaAvailable || 0) > 0)) ||
         (tab === 'lowStock' && days < 15) ||
         (tab === 'india' && Number(s.indiaAvailable || 0) > 0) ||
         (tab === 'usa' && Number(s.usaAvailable || 0) > 0) ||
@@ -245,43 +305,100 @@ export function Inventory() {
         (status === 'inStockIndia' && Number(s.indiaAvailable || 0) > 0) ||
         (status === 'inTransit' && Number(s.inTransit || 0) > 0)
 
-      return matchesQuery && matchesCollection && matchesTab && matchesStatus
-    })
-  }, [skus, tab, query, collection, status])
+      const matchesWh =
+        whFilter === 'all' ||
+        (whFilter === 'india' && Number(s.indiaAvailable || 0) > 0) ||
+        (whFilter === 'usa' && Number(s.usaAvailable || 0) > 0)
 
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize)
+      const matchesRack =
+        rackFilter === 'all' ||
+        (rackFilter.startsWith('IN ') && indiaLoc.rack === rackFilter.slice(3)) ||
+        (rackFilter.startsWith('US ') && usaLoc.rack === rackFilter.slice(3))
+
+      return (
+        matchesQuery &&
+        matchesCollection &&
+        matchesTab &&
+        matchesStatus &&
+        matchesWh &&
+        matchesRack
+      )
+    })
+  }, [skus, tab, query, collection, status, whFilter, rackFilter])
+
+  const sorted = useMemo(() => {
+    if (tab !== 'pickup') return filtered
+    return [...filtered].sort((a, b) => {
+      const pa = pickPath(locOf(a, Number(stockOf(a).usaAvailable || 0) > 0 ? 'usa' : 'india'), '')
+      const pb = pickPath(locOf(b, Number(stockOf(b).usaAvailable || 0) > 0 ? 'usa' : 'india'), '')
+      return pa.localeCompare(pb)
+    })
+  }, [filtered, tab])
+
+  const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize)
   const inTransitTotal = skus.reduce((sum, s) => sum + Number(stockOf(s).inTransit || 0), 0)
 
   const tabs: { id: StockTab; label: string }[] = [
     { id: 'all', label: `All Rug SKUs (${skus.length})` },
+    { id: 'pickup', label: 'Pickup / dispatch' },
     { id: 'lowStock', label: 'Low Stock Risk (< 15 Days)' },
     { id: 'india', label: 'In Stock (India WH)' },
-    { id: 'usa', label: 'In Stock (USA 3PL)' },
+    { id: 'usa', label: 'In Stock (USA WH)' },
     { id: 'inTransit', label: `In-Transit Cargo (${inTransitTotal})` },
     { id: 'heritage', label: 'Heritage Collection' },
     { id: 'boho', label: 'Modern / Jute' },
   ]
 
+  const emptyForm = () =>
+    Object.fromEntries(
+      [
+        ...PRODUCT_FIELDS,
+        'indiaZone',
+        'indiaAisle',
+        'indiaRack',
+        'indiaBin',
+        'indiaNote',
+        'indiaPhotoUrl',
+        'usaZone',
+        'usaAisle',
+        'usaRack',
+        'usaBin',
+        'usaNote',
+        'usaPhotoUrl',
+      ].map((k) => [k, '']),
+    )
+
   const openCreate = () => {
     setEditingSku(null)
-    setForm(Object.fromEntries(FORM_FIELDS.map((k) => [k, ''])))
+    setForm(emptyForm())
     setEditorOpen(true)
   }
 
   const openEdit = (sku: ResourceRow) => {
     const code = String(sku.sku)
+    const s = stockOf(sku)
     setEditingSku(code)
-    setForm(
-      Object.fromEntries(
-        FORM_FIELDS.map((k) => [k, sku[k] == null ? '' : String(sku[k])]),
+    setForm({
+      ...emptyForm(),
+      ...Object.fromEntries(
+        PRODUCT_FIELDS.map((k) => {
+          if (k === 'indiaAvailable') return [k, String(s.indiaAvailable ?? sku.indiaAvailable ?? '')]
+          if (k === 'usaAvailable') return [k, String(s.usaAvailable ?? sku.usaAvailable ?? '')]
+          return [k, sku[k] == null ? '' : String(sku[k])]
+        }),
       ),
-    )
+      ...flattenLocToForm(sku),
+    })
     setEditorOpen(true)
   }
 
   const save = async () => {
     try {
       setSaving(true)
+      const india = Number(form.indiaAvailable || 0) || 0
+      const usa = Number(form.usaAvailable || 0) || 0
+      const existing = editingSku ? skus.find((s) => s.sku === editingSku) : undefined
+      const prevStock = stockOf(existing || {})
       const payload: ResourceRow = {
         sku: form.sku,
         odetteSku: form.odetteSku,
@@ -295,23 +412,24 @@ export function Inventory() {
         weightKg: Number(form.weightKg || 0),
         barcode: form.barcode,
         imageUrl: form.imageUrl,
+        indiaAvailable: india,
+        usaAvailable: usa,
+        stock: {
+          indiaAvailable: india,
+          indiaPacked: Number(prevStock.indiaPacked || 0),
+          inTransit: Number(prevStock.inTransit || 0),
+          usaAvailable: usa,
+          usaReserved: Number(prevStock.usaReserved || 0),
+          fba: Number(prevStock.fba || 0),
+        },
+        locations: locationsFromForm(form),
       }
       if (!payload.sku) throw new Error('SKU is required')
+      if (!payload.title) throw new Error('Title is required')
       if (editingSku) {
-        const existing = skus.find((s) => s.sku === editingSku)
         await update('skus', editingSku, { ...existing, ...payload })
       } else {
-        await create('skus', {
-          ...payload,
-          stock: {
-            indiaAvailable: 0,
-            indiaPacked: 0,
-            inTransit: 0,
-            usaAvailable: 0,
-            usaReserved: 0,
-            fba: 0,
-          },
-        })
+        await create('skus', payload)
       }
       setEditorOpen(false)
     } catch (err) {
@@ -334,15 +452,59 @@ export function Inventory() {
     }
   }
 
+  const uploadPhoto = async (folder: 'inventory-locations' | 'warehouse-photos', key: string, file: File) => {
+    const dataUrl = await fileToDataUrl(file)
+    const res = await api.uploads.photo({ photoDataUrl: dataUrl, folder, key })
+    return res.url
+  }
+
+  const onLocPhoto = async (wh: WhKey, file: File | undefined) => {
+    if (!file) return
+    try {
+      setPhotoBusy(wh)
+      const url = await uploadPhoto('inventory-locations', `${form.sku || 'sku'}-${wh}`, file)
+      setForm((f) => ({ ...f, [`${wh}PhotoUrl`]: url }))
+      pushToast('Location photo saved', 'success')
+    } catch (err) {
+      pushToast(err instanceof ApiError ? err.message : 'Photo upload failed', 'danger')
+    } finally {
+      setPhotoBusy(null)
+    }
+  }
+
+  const onWarehousePhoto = async (wh: ResourceRow, file: File | undefined) => {
+    if (!file) return
+    const id = String(wh.id || '')
+    try {
+      setPhotoBusy(id)
+      const url = await uploadPhoto('warehouse-photos', id || 'wh', file)
+      const photos = [wh.imageUrl, wh.photo2Url, wh.photo3Url].map((p) => String(p || '')).filter(Boolean)
+      const next: ResourceRow = { ...wh }
+      if (!next.imageUrl) next.imageUrl = url
+      else if (!next.photo2Url) next.photo2Url = url
+      else next.photo3Url = url
+      if (photos.length >= 3) next.photo3Url = url
+      await update('warehouses', id, next)
+      pushToast('Warehouse photo saved', 'success')
+    } catch (err) {
+      pushToast(err instanceof ApiError ? err.message : 'Warehouse photo failed', 'danger')
+    } finally {
+      setPhotoBusy(null)
+    }
+  }
+
+  const locLine = (sku: ResourceRow, wh: WhKey) => pickPath(locOf(sku, wh), wh === 'india' ? 'India WH' : 'US WH')
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-[var(--text-main)] sm:text-2xl">
-            Products & Global Multi-Warehouse Inventory Hub
+            Inventory · rack location & pickup
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Live MongoDB SKU master — add, edit, and delete persist to rugos_erp
+            Upload SKUs with warehouse, zone, aisle, rack and bin. Dispatch picks from that location.
+            Add live photos of the warehouse and the bin where the rug sits.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -379,6 +541,72 @@ export function Inventory() {
         </div>
       ) : null}
 
+      <div className="grid gap-3 md:grid-cols-2">
+        {warehouses.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[var(--border-main)] px-4 py-6 text-sm text-[var(--text-muted)]">
+            No warehouse master photos yet. Add India / US warehouses under Masters → Warehouses, then
+            upload floor photos here.
+          </div>
+        ) : (
+          warehouses.map((wh) => {
+            const pics = [wh.imageUrl, wh.photo2Url, wh.photo3Url, wh.floorPlanUrl]
+              .map((p) => String(p || ''))
+              .filter(Boolean)
+            const id = String(wh.id || '')
+            return (
+              <article
+                key={id}
+                className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 shadow-[var(--shadow-sm)]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-600">
+                      Warehouse floor
+                    </p>
+                    <h2 className="text-sm font-bold text-[var(--text-main)]">{String(wh.name || id)}</h2>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {[wh.city, wh.country, wh.address].filter(Boolean).join(' · ') || '—'}
+                    </p>
+                  </div>
+                  <label className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-[var(--border-main)] px-2 text-[11px] font-semibold">
+                    <Camera className="h-3.5 w-3.5" />
+                    {photoBusy === id ? 'Saving…' : 'Add photo'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      disabled={photoBusy === id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        e.target.value = ''
+                        void onWarehousePhoto(wh, file)
+                      }}
+                    />
+                  </label>
+                </div>
+                {pics.length ? (
+                  <div className="mt-3 flex gap-2 overflow-x-auto">
+                    {pics.map((src) => (
+                      <img
+                        key={src}
+                        src={mediaUrl(src, api.base)}
+                        alt=""
+                        className="h-24 w-36 shrink-0 rounded-lg border border-[var(--border-main)] object-cover"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-[var(--text-dim)]">
+                    No live photos yet — add a floor / rack photo so pickers know the layout.
+                  </p>
+                )}
+              </article>
+            )
+          })
+        )}
+      </div>
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map((t) => (
           <button
@@ -400,7 +628,7 @@ export function Inventory() {
       </div>
 
       <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
-        <div className="flex flex-col gap-3 border-b border-[var(--border-main)] p-4 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-3 border-b border-[var(--border-main)] p-4 lg:flex-row lg:flex-wrap lg:items-center">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search inventory</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
@@ -410,10 +638,39 @@ export function Inventory() {
                 setQuery(e.target.value)
                 setPage(1)
               }}
-              placeholder="Search by SKU code, title, weave, material, or barcode..."
+              placeholder="Search SKU, title, rack, aisle, bin…"
               className="h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] pl-10 pr-3 text-sm outline-none focus:border-indigo-500"
             />
           </label>
+          <select
+            value={whFilter}
+            onChange={(e) => {
+              setWhFilter(e.target.value as 'all' | WhKey)
+              setPage(1)
+            }}
+            className="h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+            aria-label="Warehouse filter"
+          >
+            <option value="all">All warehouses</option>
+            <option value="india">India WH</option>
+            <option value="usa">US WH</option>
+          </select>
+          <select
+            value={rackFilter}
+            onChange={(e) => {
+              setRackFilter(e.target.value)
+              setPage(1)
+            }}
+            className="h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+            aria-label="Rack filter"
+          >
+            <option value="all">All racks</option>
+            {rackOptions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
           <select
             value={collection}
             onChange={(e) => {
@@ -441,39 +698,42 @@ export function Inventory() {
           >
             <option value="all">All Stock Statuses</option>
             <option value="lowStock">Low Stock Alert (&lt; 15 Days)</option>
-            <option value="inStockUSA">Available at USA 3PL</option>
+            <option value="inStockUSA">Available at USA WH</option>
             <option value="inStockIndia">Available in India WH</option>
             <option value="inTransit">Currently In-Transit</option>
           </select>
-          <div className="flex items-center gap-2 lg:ml-auto">
-            <span className="text-xs font-medium text-[var(--text-muted)]">
-              {loading ? 'Loading…' : `${filtered.length} matching SKUs`}
-            </span>
-            <Button variant="purple" size="sm" onClick={openCreate}>
-              <Plus className="h-3.5 w-3.5" /> New SKU
-            </Button>
-          </div>
+          <span className="text-xs font-medium text-[var(--text-muted)] lg:ml-auto">
+            {loading ? 'Loading…' : `${sorted.length} matching SKUs`}
+          </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full text-left text-sm">
+          <table className="min-w-[1200px] w-full text-left text-sm">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
               <tr>
                 <th className="px-4 py-3 font-semibold">SKU & Thumbnail</th>
                 <th className="px-4 py-3 font-semibold">Rug Title & Collection</th>
-                <th className="px-4 py-3 font-semibold">Construction & Specs</th>
+                <th className="px-4 py-3 font-semibold">Pick location (rack / bin)</th>
                 <th className="px-4 py-3 font-semibold">Selling Price</th>
                 <th className="px-4 py-3 font-semibold">In Stock</th>
                 <th className="px-4 py-3 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
+              {pageItems.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
+                    No SKUs match these filters.
+                  </td>
+                </tr>
+              ) : null}
               {pageItems.map((sku) => {
                 const days = getDaysOfCover(sku)
                 const total = getSkuTotalStock(sku)
                 const s = stockOf(sku)
                 const img = String(sku.imageUrl || '')
-                const material = String(sku.material || '')
+                const indiaLoc = locOf(sku, 'india')
+                const usaLoc = locOf(sku, 'usa')
                 return (
                   <tr key={String(sku.sku)} className="border-t border-[var(--border-main)] align-top">
                     <td className="px-4 py-3">
@@ -502,16 +762,38 @@ export function Inventory() {
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         <Badge>{String(sku.collection || '—')}</Badge>
                       </div>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {String(sku.size || '—')} · {String(sku.construction || '')} ·{' '}
+                        {Number(sku.weightKg || 0)} kg
+                      </p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-[var(--text-main)]">{String(sku.size || '—')}</p>
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        {String(sku.construction || '')}
-                      </p>
-                      <p className="text-xs text-[var(--text-dim)]">
-                        {material.slice(0, 48)}
-                        {material.length > 48 ? '…' : ''} · {Number(sku.weightKg || 0)} kg
-                      </p>
+                      <div className="flex gap-2">
+                        {indiaLoc.photoUrl ? (
+                          <img
+                            src={mediaUrl(indiaLoc.photoUrl, api.base)}
+                            alt="India bin"
+                            className="h-12 w-12 rounded-lg border object-cover"
+                          />
+                        ) : null}
+                        {usaLoc.photoUrl ? (
+                          <img
+                            src={mediaUrl(usaLoc.photoUrl, api.base)}
+                            alt="US bin"
+                            className="h-12 w-12 rounded-lg border object-cover"
+                          />
+                        ) : null}
+                        <div>
+                          <p className="flex items-center gap-1 text-xs font-semibold text-[var(--text-main)]">
+                            <MapPin className="h-3.5 w-3.5 text-indigo-600" />
+                            {locLine(sku, 'india')}
+                          </p>
+                          <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-[var(--text-main)]">
+                            <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                            {locLine(sku, 'usa')}
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
@@ -539,6 +821,9 @@ export function Inventory() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
+                        <Button variant="secondary" size="sm" onClick={() => setPickSku(sku)}>
+                          <MapPin className="h-3.5 w-3.5" /> Pick
+                        </Button>
                         <Button variant="secondary" size="sm" title="GRN">
                           <PackagePlus className="h-3.5 w-3.5" /> GRN
                         </Button>
@@ -579,7 +864,7 @@ export function Inventory() {
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={filtered.length}
+          total={sorted.length}
           onPageChange={setPage}
           onPageSizeChange={(size) => {
             setPageSize(size)
@@ -590,7 +875,7 @@ export function Inventory() {
 
       <Modal
         open={editorOpen}
-        title={editingSku ? 'Edit Rug SKU' : 'Add New Rug SKU'}
+        title={editingSku ? 'Edit Rug SKU + location' : 'Add Rug SKU + rack location'}
         badge={editingSku ? 'Update' : 'Create'}
         size="lg"
         onClose={() => setEditorOpen(false)}
@@ -605,15 +890,15 @@ export function Inventory() {
           </>
         }
       >
-        <div className="grid max-h-[60vh] gap-3 overflow-y-auto sm:grid-cols-2">
-          {FORM_FIELDS.map((key) => (
+        <div className="grid max-h-[65vh] gap-3 overflow-y-auto sm:grid-cols-2">
+          {PRODUCT_FIELDS.map((key) => (
             <label
               key={key}
               className={`block text-xs font-semibold text-[var(--text-main)] ${
                 key === 'title' || key === 'material' ? 'sm:col-span-2' : ''
               }`}
             >
-              {key}
+              {FIELD_LABELS[key] || key}
               <input
                 className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
                 value={form[key] ?? ''}
@@ -622,7 +907,117 @@ export function Inventory() {
               />
             </label>
           ))}
+
+          {(['india', 'usa'] as const).map((wh) => (
+            <fieldset
+              key={wh}
+              className="sm:col-span-2 grid gap-3 rounded-xl border border-[var(--border-main)] p-3 sm:grid-cols-4"
+            >
+              <legend className="px-1 text-xs font-bold uppercase text-indigo-600">
+                {wh === 'india' ? 'India warehouse location' : 'US warehouse location'}
+              </legend>
+              {(
+                [
+                  ['Zone', `${wh}Zone`],
+                  ['Aisle', `${wh}Aisle`],
+                  ['Rack', `${wh}Rack`],
+                  ['Bin', `${wh}Bin`],
+                ] as const
+              ).map(([label, key]) => (
+                <label key={key} className="block text-xs font-semibold text-[var(--text-main)]">
+                  {label}
+                  <input
+                    className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+                    value={form[key] ?? ''}
+                    placeholder={label === 'Rack' ? 'R-04' : label === 'Bin' ? 'B-02' : ''}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  />
+                </label>
+              ))}
+              <label className="block text-xs font-semibold text-[var(--text-main)] sm:col-span-3">
+                Location note
+                <input
+                  className="mt-1 h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+                  value={form[`${wh}Note`] ?? ''}
+                  placeholder="e.g. left of wash bay / near pack bench"
+                  onChange={(e) => setForm((f) => ({ ...f, [`${wh}Note`]: e.target.value }))}
+                />
+              </label>
+              <div className="sm:col-span-1">
+                <p className="text-xs font-semibold text-[var(--text-main)]">Bin photo</p>
+                {form[`${wh}PhotoUrl`] ? (
+                  <img
+                    src={mediaUrl(form[`${wh}PhotoUrl`], api.base)}
+                    alt=""
+                    className="mt-1 h-16 w-full rounded-lg border object-cover"
+                  />
+                ) : (
+                  <div className="mt-1 flex h-16 items-center justify-center rounded-lg border border-dashed text-[10px] text-[var(--text-dim)]">
+                    No photo
+                  </div>
+                )}
+                <label className="mt-1 inline-flex h-8 cursor-pointer items-center gap-1 text-[11px] font-semibold text-indigo-700">
+                  <Camera className="h-3.5 w-3.5" />
+                  {photoBusy === wh ? 'Saving…' : 'Upload / camera'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    disabled={photoBusy === wh}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      void onLocPhoto(wh, file)
+                    }}
+                  />
+                </label>
+              </div>
+            </fieldset>
+          ))}
         </div>
+      </Modal>
+
+      <Modal
+        open={!!pickSku}
+        title={pickSku ? `Pick ${String(pickSku.sku)}` : 'Pick location'}
+        badge="Dispatch"
+        size="lg"
+        onClose={() => setPickSku(null)}
+        footer={
+          <Button variant="secondary" onClick={() => setPickSku(null)}>
+            Close
+          </Button>
+        }
+      >
+        {pickSku ? (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-[var(--text-main)]">{String(pickSku.title)}</p>
+            {(['india', 'usa'] as const).map((wh) => {
+              const loc = locOf(pickSku, wh)
+              const s = stockOf(pickSku)
+              const qty = wh === 'india' ? Number(s.indiaAvailable || 0) : Number(s.usaAvailable || 0)
+              return (
+                <div key={wh} className="rounded-xl border border-[var(--border-main)] p-3">
+                  <p className="text-xs font-bold uppercase text-indigo-600">
+                    {wh === 'india' ? 'India Warehouse' : 'US Warehouse'} · qty {qty}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">{pickPath(loc, wh === 'india' ? 'India WH' : 'US WH')}</p>
+                  {loc.note ? <p className="mt-1 text-xs text-[var(--text-muted)]">{loc.note}</p> : null}
+                  {loc.photoUrl ? (
+                    <img
+                      src={mediaUrl(loc.photoUrl, api.base)}
+                      alt=""
+                      className="mt-2 max-h-48 w-full rounded-lg border object-cover"
+                    />
+                  ) : (
+                    <p className="mt-2 text-xs text-[var(--text-dim)]">No bin photo yet — edit SKU to add one.</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
       </Modal>
 
       <Modal

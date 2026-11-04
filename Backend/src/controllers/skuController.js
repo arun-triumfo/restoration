@@ -18,6 +18,10 @@ export async function listSkus(req, res) {
         { construction: new RegExp(q, 'i') },
         { barcode: new RegExp(q, 'i') },
         { collection: new RegExp(q, 'i') },
+        { 'locations.india.rack': new RegExp(q, 'i') },
+        { 'locations.india.bin': new RegExp(q, 'i') },
+        { 'locations.usa.rack': new RegExp(q, 'i') },
+        { 'locations.usa.bin': new RegExp(q, 'i') },
       ]
     }
 

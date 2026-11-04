@@ -270,6 +270,14 @@ export const api = {
       ),
   },
 
+  uploads: {
+    photo: (payload: { photoDataUrl: string; folder?: string; key?: string }) =>
+      request<{ success: boolean; url: string; folder?: string; fileName?: string }>(
+        '/uploads/photo',
+        { method: 'POST', body: JSON.stringify(payload) },
+      ),
+  },
+
   packing: {
     queue: () =>
       request<{ success: boolean; count: number; data: ResourceRow[] }>('/packing/queue'),

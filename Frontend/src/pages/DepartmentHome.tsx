@@ -45,11 +45,25 @@ export function DepartmentHome() {
           icon: Bell,
         },
         {
-          label: 'Orders in pipeline',
+          label: 'All orders',
           value: String(orders.length),
-          hint: `${indiaQueue} India queue · ${usQueue} US bucket`,
-          to: '/orders',
+          hint: `${indiaQueue} India · ${usQueue} assigned to US`,
+          to: '/orders?bucket=all',
           icon: ShoppingBag,
+        },
+        {
+          label: 'India queue',
+          value: String(indiaQueue),
+          hint: 'Work still with India WH',
+          to: '/orders?bucket=india',
+          icon: Boxes,
+        },
+        {
+          label: 'Assigned to US',
+          value: String(usQueue),
+          hint: 'India sent courier label → US bucket',
+          to: '/orders?bucket=usa',
+          icon: Truck,
         },
         {
           label: 'SKU catalog',
@@ -71,8 +85,15 @@ export function DepartmentHome() {
           label: 'India order queue',
           value: String(indiaQueue),
           hint: 'Barcode · ship to US · make',
-          to: '/orders',
+          to: '/orders?bucket=india',
           icon: ShoppingBag,
+        },
+        {
+          label: 'Assigned to US',
+          value: String(usQueue),
+          hint: 'Sent to US manager — check status',
+          to: '/orders?bucket=usa',
+          icon: Truck,
         },
         {
           label: 'MTO / PO work',
@@ -100,8 +121,8 @@ export function DepartmentHome() {
         {
           label: 'US order bucket',
           value: String(usQueue),
-          hint: 'Pack & dispatch to customer',
-          to: '/orders',
+          hint: 'Assigned by India — pack & dispatch',
+          to: '/orders?bucket=usa',
           icon: ShoppingBag,
         },
         {

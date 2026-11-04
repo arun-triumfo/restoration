@@ -24,6 +24,20 @@ function Packing() {
   return getResourceModel('packing_events', 'id', true)
 }
 
+function Skus() {
+  return getResourceModel('skus', 'sku', true)
+}
+
+function locPath(loc, label) {
+  if (!loc) return `${label} · location not set`
+  const bits = [label]
+  if (loc.zone) bits.push(`Zone ${loc.zone}`)
+  if (loc.aisle) bits.push(`Aisle ${loc.aisle}`)
+  if (loc.rack) bits.push(`Rack ${loc.rack}`)
+  if (loc.bin) bits.push(`Bin ${loc.bin}`)
+  return bits.length > 1 ? bits.join(' · ') : `${label} · location not set`
+}
+
 const WH_ROLES = new Set(['super_admin', 'india_wh', 'usa_wh'])
 
 export function requireWarehouseRole(req, res, next) {
@@ -134,7 +148,25 @@ export async function listPackingQueue(req, res) {
       filter.$or = [{ queueOwner: 'india_wh' }, { queueOwner: { $exists: false } }]
     }
     const data = await Orders().find(filter).sort({ updatedAt: -1 }).limit(40).lean()
-    res.json({ success: true, count: data.length, data })
+    const skuCodes = [...new Set(data.map((o) => o.sku).filter(Boolean))]
+    const skuDocs = skuCodes.length
+      ? await Skus().find({ sku: { $in: skuCodes } }).lean()
+      : []
+    const skuMap = Object.fromEntries(skuDocs.map((s) => [s.sku, s]))
+    const enriched = data.map((o) => {
+      const sku = skuMap[o.sku] || {}
+      const loc = sku.locations || {}
+      const useUsa = o.queueOwner === 'usa_wh'
+      const bin = useUsa ? loc.usa : loc.india
+      return {
+        ...o,
+        pickPath: locPath(bin, useUsa ? 'US Warehouse' : 'India Warehouse'),
+        pickPhotoUrl: bin?.photoUrl || '',
+        pickRack: bin?.rack || '',
+        pickBin: bin?.bin || '',
+      }
+    })
+    res.json({ success: true, count: enriched.length, data: enriched })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
   }

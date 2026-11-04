@@ -14,8 +14,8 @@ import {
   Truck,
   Zap,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError, type ResourceRow } from '../api/client'
 import { normalizeRoleCode } from '../auth/roles'
 import { Badge } from '../components/ui/Badge'
@@ -25,8 +25,17 @@ import { Pagination } from '../components/ui/Pagination'
 import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
+import { firstDate, inDateRange } from '../lib/dateRange'
+import { locOf, pickPath } from '../lib/inventoryLocation'
 
 type OrderTab = 'all' | 'pending' | 'packed' | 'transit' | 'delivered'
+type BucketFilter = 'all' | 'india' | 'usa'
+
+function defaultBucket(role: string): BucketFilter {
+  if (role === 'usa_wh') return 'usa'
+  if (role === 'india_wh') return 'india'
+  return 'all'
+}
 
 const RUG_PLACEHOLDER =
   'https://images.unsplash.com/photo-1600121848594-d8644e57abab?auto=format&fit=crop&w=160&q=70'
@@ -66,6 +75,8 @@ type SkuInfo = {
   collection: string
   india: number
   usa: number
+  indiaPick: string
+  usaPick: string
 }
 
 function inIndiaQueue(order: ResourceRow) {
@@ -74,6 +85,14 @@ function inIndiaQueue(order: ResourceRow) {
 
 function inUsQueue(order: ResourceRow) {
   return String(order.queueOwner || '') === 'usa_wh'
+}
+
+function assignedToUs(order: ResourceRow) {
+  return inUsQueue(order) || Boolean(order.labelSentToUs)
+}
+
+function inIndiaWorkQueue(order: ResourceRow) {
+  return inIndiaQueue(order) || String(order.status || '').toLowerCase().includes('in process')
 }
 
 function isPending(st: string) {
@@ -185,6 +204,7 @@ export function Orders() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { list, create, update, remove, loading, error, refresh } = useData()
+  const [searchParams] = useSearchParams()
   const orders = list('orders')
   const skus = list('skus')
   const mtoJobs = list('mto')
@@ -203,6 +223,8 @@ export function Orders() {
         collection: String(s.collection || ''),
         india: stock.india,
         usa: stock.usa,
+        indiaPick: pickPath(locOf(s, 'india'), 'India WH'),
+        usaPick: pickPath(locOf(s, 'usa'), 'US WH'),
       })
     }
     return map
@@ -231,9 +253,12 @@ export function Orders() {
   }
 
   const [tab, setTab] = useState<OrderTab>('pending')
+  const [bucket, setBucket] = useState<BucketFilter>(() => defaultBucket(role))
   const [query, setQuery] = useState('')
   const [channel, setChannel] = useState('all')
   const [status, setStatus] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(5)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -308,17 +333,28 @@ export function Orders() {
     setProductNotes(String(order.shipProductNotes || ''))
   }
 
+  useEffect(() => {
+    const b = searchParams.get('bucket')
+    if (b === 'all' || b === 'india' || b === 'usa') {
+      setBucket(role === 'usa_wh' ? 'usa' : b)
+    }
+    const q = searchParams.get('q')
+    if (q) setQuery(q)
+  }, [searchParams, role])
+
+  const indiaCount = useMemo(() => orders.filter(inIndiaWorkQueue).length, [orders])
+  const usCount = useMemo(() => orders.filter(assignedToUs).length, [orders])
+
   const roleScoped = useMemo(() => {
-    if (role === 'super_admin' || role === 'finance') return orders
-    // US bucket only — after India sends courier label PDF
-    if (role === 'usa_wh') return orders.filter(inUsQueue)
-    // India queue only — once order moves to US manager, drop it from India list
-    return orders.filter(
-      (o) =>
-        inIndiaQueue(o) ||
-        String(o.status || '').toLowerCase().includes('in process'),
-    )
-  }, [orders, role])
+    if (role === 'usa_wh') return orders.filter(assignedToUs)
+    if (role === 'india_wh') {
+      return bucket === 'usa' ? orders.filter(assignedToUs) : orders.filter(inIndiaWorkQueue)
+    }
+    // Super Admin + Finance see every order; bucket chips narrow the list
+    if (bucket === 'india') return orders.filter(inIndiaWorkQueue)
+    if (bucket === 'usa') return orders.filter(assignedToUs)
+    return orders
+  }, [orders, role, bucket])
 
   const filtered = useMemo(() => {
     const rows = roleScoped.filter((order) => {
@@ -329,23 +365,29 @@ export function Orders() {
       const title = skuMap.get(sku)?.title || ''
       const ch = String(order.channel || '')
       const st = String(order.status || '')
+      const awb = String(order.awb || '')
       const locked = String(order.stockAllocation || '').toLowerCase().includes('lock')
+      const when = firstDate(order.orderDate, order.createdAt, order.updatedAt)
 
       const matchesQuery =
         !q ||
         orderId.toLowerCase().includes(q) ||
         buyerName.toLowerCase().includes(q) ||
         sku.toLowerCase().includes(q) ||
-        title.toLowerCase().includes(q)
+        title.toLowerCase().includes(q) ||
+        awb.toLowerCase().includes(q)
 
       const matchesChannel = channel === 'all' || ch.toLowerCase().includes(channel)
       const matchesStatus =
         status === 'all' ||
-        (status === 'locked' && locked) ||
+        (status === 'pending' && st === 'Pending Allocation') ||
+        (status === 'ready_pack' && (st === 'Ready to Pack' || st === 'Ready to Label')) ||
+        (status === 'make' && (st === 'To Make (MTO)' || st === 'In Process')) ||
+        (status === 'label' && (st === 'Label Created' || Boolean(order.labelGenerated))) ||
         (status === 'packed' && st.includes('Packed')) ||
         (status === 'transit' && st === 'In Transit') ||
         (status === 'delivered' && st === 'Delivered') ||
-        (status === 'make' && (st === 'To Make (MTO)' || st === 'In Process'))
+        (status === 'locked' && locked)
 
       const matchesTab =
         tab === 'all' ||
@@ -354,7 +396,9 @@ export function Orders() {
         (tab === 'transit' && st === 'In Transit') ||
         (tab === 'delivered' && st === 'Delivered')
 
-      return matchesQuery && matchesChannel && matchesStatus && matchesTab
+      const matchesDate = inDateRange(when, dateFrom, dateTo)
+
+      return matchesQuery && matchesChannel && matchesStatus && matchesTab && matchesDate
     })
 
     return [...rows].sort((a, b) => {
@@ -363,7 +407,7 @@ export function Orders() {
       if (ra !== rb) return ra - rb
       return String(b.orderId).localeCompare(String(a.orderId))
     })
-  }, [roleScoped, tab, query, channel, status, skuMap])
+  }, [roleScoped, tab, query, channel, status, dateFrom, dateTo, skuMap])
 
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize)
   const pendingCount = roleScoped.filter((o) => isPending(String(o.status || ''))).length
@@ -472,7 +516,9 @@ export function Orders() {
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             Only 2 warehouses: <strong>India Warehouse</strong> and <strong>US Warehouse</strong>.
-            Pending work is listed first.
+            {role === 'super_admin' || role === 'finance'
+              ? ' Super Admin / Finance see every order — use bucket + date filters.'
+              : ' Pending work is listed first.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -518,6 +564,67 @@ export function Orders() {
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           API error: {error}
+        </div>
+      ) : null}
+
+      {role !== 'usa_wh' ? (
+        <div className="flex flex-wrap gap-2">
+          {(role === 'super_admin' || role === 'finance') && (
+            <button
+              type="button"
+              onClick={() => {
+                setBucket('all')
+                setPage(1)
+              }}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                bucket === 'all'
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-muted)]'
+              }`}
+            >
+              All buckets ({orders.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setBucket('india')
+              setPage(1)
+            }}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+              bucket === 'india'
+                ? 'border-indigo-600 bg-indigo-600 text-white'
+                : 'border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-muted)]'
+            }`}
+          >
+            {role === 'india_wh' ? 'My queue' : 'India queue'} ({indiaCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setBucket('usa')
+              setPage(1)
+            }}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+              bucket === 'usa'
+                ? 'border-indigo-600 bg-indigo-600 text-white'
+                : 'border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-muted)]'
+            }`}
+          >
+            {role === 'india_wh' ? 'Assigned to US' : 'US bucket'} ({usCount})
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs font-semibold text-[var(--text-muted)]">
+          US bucket — {usCount} order(s) assigned by India Warehouse. Date / channel / status
+          filters apply below.
+        </p>
+      )}
+
+      {role === 'india_wh' && bucket === 'usa' ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-2 text-xs text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          Read-only trail: orders India sent to the US Warehouse (label PDF + AWB). Status updates
+          as US packs and dispatches. History is on each order → View.
         </div>
       ) : null}
 
@@ -582,12 +689,54 @@ export function Orders() {
             aria-label="Status filter"
           >
             <option value="all">All Statuses</option>
-            <option value="locked">Stock Locked</option>
+            <option value="pending">Pending Allocation</option>
+            <option value="ready_pack">Ready to Pack</option>
+            <option value="make">In Process / Make</option>
+            <option value="label">Label Created</option>
             <option value="packed">Packed & Handover</option>
             <option value="transit">In Transit</option>
             <option value="delivered">Delivered</option>
-            <option value="make">In Process / Make</option>
+            <option value="locked">Stock Locked</option>
           </select>
+          <label className="flex h-10 items-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2 text-xs text-[var(--text-muted)]">
+            From
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value)
+                setPage(1)
+              }}
+              className="h-8 bg-transparent text-sm text-[var(--text-main)] outline-none"
+              aria-label="Order date from"
+            />
+          </label>
+          <label className="flex h-10 items-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-2 text-xs text-[var(--text-muted)]">
+            To
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value)
+                setPage(1)
+              }}
+              className="h-8 bg-transparent text-sm text-[var(--text-main)] outline-none"
+              aria-label="Order date to"
+            />
+          </label>
+          {dateFrom || dateTo ? (
+            <button
+              type="button"
+              className="h-10 rounded-lg border border-[var(--border-main)] px-3 text-xs font-semibold text-[var(--text-muted)]"
+              onClick={() => {
+                setDateFrom('')
+                setDateTo('')
+                setPage(1)
+              }}
+            >
+              Clear dates
+            </button>
+          ) : null}
           <span className="text-xs font-medium text-[var(--text-muted)] lg:ml-auto">
             {loading ? 'Loading…' : `${filtered.length} orders`}
           </span>
@@ -605,6 +754,16 @@ export function Orders() {
               </tr>
             </thead>
             <tbody>
+              {pageItems.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-10 text-center text-sm text-[var(--text-muted)]"
+                  >
+                    No orders match these filters.
+                  </td>
+                </tr>
+              ) : null}
               {pageItems.map((order) => {
                 const sku = String(order.sku || '')
                 const info = skuMap.get(sku)
@@ -613,7 +772,9 @@ export function Orders() {
                 const loc = locationInfo(order)
                 const locked = String(order.stockAllocation || '').toLowerCase().includes('lock')
                 const oid = String(order.orderId)
-                const canIndiaAct = role === 'india_wh' || role === 'super_admin'
+                const indiaReadOnly = role === 'india_wh' && bucket === 'usa'
+                const canIndiaAct =
+                  !indiaReadOnly && (role === 'india_wh' || role === 'super_admin')
                 const canUsAct = role === 'usa_wh' || role === 'super_admin'
                 const showBarcode =
                   canIndiaAct &&
@@ -667,12 +828,23 @@ export function Orders() {
                             Inventory stock → India: <strong>{info?.india ?? '—'}</strong> · US:{' '}
                             <strong>{info?.usa ?? '—'}</strong>
                           </p>
+                          <p className="mt-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                            Pick: {loc.wh.includes('US') ? info?.usaPick : info?.indiaPick}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-bold text-[var(--text-main)]">{oid}</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--text-dim)]">
+                        {String(order.orderDate || '').slice(0, 10) || 'No date'}
+                      </p>
                       <div className="mt-1 flex flex-wrap gap-1">
+                        {(role === 'super_admin' || role === 'finance' || bucket === 'all') && (
+                          <Badge tone={assignedToUs(order) ? 'success' : 'purple'}>
+                            {assignedToUs(order) ? 'US bucket' : 'India queue'}
+                          </Badge>
+                        )}
                         <Badge tone={channelTone[String(order.channel)] ?? 'slate'}>
                           {String(order.channel)}
                         </Badge>
@@ -863,10 +1035,12 @@ export function Orders() {
                           >
                             <Eye className="h-3.5 w-3.5" /> View
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(order)}>
-                            <Pencil className="h-3.5 w-3.5" /> Edit
-                          </Button>
-                          {(canIndiaAct || role === 'super_admin') && (
+                          {!indiaReadOnly ? (
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(order)}>
+                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                          ) : null}
+                          {canIndiaAct && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -881,13 +1055,15 @@ export function Orders() {
                               Re-check
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeleteId(oid)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-red-500" /> Delete
-                          </Button>
+                          {!indiaReadOnly ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteId(oid)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" /> Delete
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     </td>
@@ -1079,13 +1255,17 @@ export function Orders() {
                 ['ETA', viewOrder.expectedWarehouseDeliveryDate || '—'],
               ].map(([label, val]) => (
                 <div key={String(label)}>
-                  <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">{label}</p>
+                  <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">
+                    {String(label)}
+                  </p>
                   <p className="font-semibold text-[var(--text-main)]">{String(val ?? '—')}</p>
                 </div>
               ))}
             </div>
 
-            {(viewOrder.shipWeightKg || viewOrder.shipPhotoUrl || viewOrder.shipPrice != null) && (
+            {(viewOrder.shipWeightKg != null ||
+              Boolean(viewOrder.shipPhotoUrl) ||
+              viewOrder.shipPrice != null) ? (
               <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] p-3">
                 <p className="text-[10px] font-bold uppercase text-[var(--text-dim)]">
                   Shipping audit / package
@@ -1103,7 +1283,9 @@ export function Orders() {
                       : '—'}
                   </strong>
                 </p>
-                {(viewOrder.shipLengthCm || viewOrder.shipWidthCm || viewOrder.shipHeightCm) && (
+                {Boolean(
+                  viewOrder.shipLengthCm || viewOrder.shipWidthCm || viewOrder.shipHeightCm,
+                ) && (
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     L×W×H: {String(viewOrder.shipLengthCm || '—')} ×{' '}
                     {String(viewOrder.shipWidthCm || '—')} × {String(viewOrder.shipHeightCm || '—')}{' '}
@@ -1136,7 +1318,7 @@ export function Orders() {
                   />
                 ) : null}
               </div>
-            )}
+            ) : null}
 
             {Array.isArray(viewOrder.history) && viewOrder.history.length > 0 ? (
               <div>

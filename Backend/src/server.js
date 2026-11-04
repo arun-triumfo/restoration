@@ -27,6 +27,7 @@ import packingRoutes from './routes/packing.js'
 import platformRoutes from './routes/platform.js'
 import resourceRoutes from './routes/resources.js'
 import shippingRoutes from './routes/shipping.js'
+import uploadRoutes from './routes/uploads.js'
 import {
   bulkReRoute,
   dispatchIndiaToCustomer,
@@ -120,6 +121,7 @@ app.use('/api/platform', platformRoutes)
 app.use('/api/integrations', integrationsRoutes)
 app.use('/api/shipping', shippingRoutes)
 app.use('/api/packing', packingRoutes)
+app.use('/api/uploads', uploadRoutes)
 
 app.post(
   '/api/purchase_orders/from-buy-sheet',
