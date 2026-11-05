@@ -1,37 +1,20 @@
 import { CreditCard, Shield } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type IntegrationConnection, type TenantDto } from '../api/client'
+import {
+  api,
+  ApiError,
+  type IntegrationConnection,
+  type SaasPlanDto,
+  type TenantDto,
+} from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/Button'
 
-const PLANS = [
-  {
-    id: 'starter',
-    label: 'Starter',
-    seats: 5,
-    blurb: 'Inventory, orders, shipping',
-    modules: ['core', 'inventory', 'orders', 'shipping'],
-  },
-  {
-    id: 'growth',
-    label: 'Growth',
-    seats: 15,
-    blurb: '+ Forecast, export docs, integrations',
-    modules: ['core', 'inventory', 'orders', 'shipping', 'forecast', 'export', 'integrations'],
-  },
-  {
-    id: 'enterprise',
-    label: 'Enterprise',
-    seats: 50,
-    blurb: 'All modules (demo)',
-    modules: ['*'],
-  },
-]
-
 export function Billing() {
-  const { user, refreshMe } = useAuth()
+  const { user, refreshMe, isPlatformOwner } = useAuth()
   const [tenant, setTenant] = useState<TenantDto | null>(user?.tenant || null)
+  const [plans, setPlans] = useState<SaasPlanDto[]>([])
   const [gateways, setGateways] = useState<IntegrationConnection[]>([])
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +24,12 @@ export function Billing() {
     try {
       const res = await api.platform.myTenant()
       setTenant(res.tenant)
+      try {
+        const planRes = await api.platform.listPlans()
+        setPlans(planRes.data || [])
+      } catch {
+        setPlans([])
+      }
       try {
         const integ = await api.integrations.list()
         setGateways(integ.data.filter((d) => d.channel === 'razorpay' || d.channel === 'stripe'))
@@ -149,12 +138,29 @@ export function Billing() {
         </p>
         <h1 className="text-2xl font-extrabold text-[var(--text-main)]">Plan & subscription</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Super Admin can switch plans in demo. Live Razorpay / Stripe checkout starts the moment keys
-          are saved on{' '}
-          <Link to="/integrations" className="font-bold text-indigo-600 no-underline dark:text-indigo-300">
-            Integrations
-          </Link>
-          .
+          Monthly / yearly SaaS plan for this company. Validity and payment show below.
+          {isPlatformOwner ? (
+            <>
+              {' '}
+              Owner console:{' '}
+              <Link to="/saas" className="font-bold text-indigo-600 no-underline dark:text-indigo-300">
+                /saas
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              {' '}
+              Gateways on{' '}
+              <Link
+                to="/integrations"
+                className="font-bold text-indigo-600 no-underline dark:text-indigo-300"
+              >
+                Integrations
+              </Link>
+              .
+            </>
+          )}
         </p>
       </header>
 
@@ -170,7 +176,14 @@ export function Billing() {
           <div className="text-right text-sm">
             <div className="font-bold text-[var(--text-main)]">{tenant?.planLabel || tenant?.plan}</div>
             <div className="text-[12px] text-[var(--text-muted)]">
-              Billing: {tenant?.billingStatus || 'active'} · Seats: {tenant?.seats ?? '—'}
+              Billing: {tenant?.billingStatus || 'active'} · Cycle: {tenant?.billingCycle || '—'} ·
+              Seats: {tenant?.seats ?? '—'}
+            </div>
+            <div className="mt-1 text-[11px] text-[var(--text-dim)]">
+              Renews: {tenant?.renewsAt ? String(tenant.renewsAt).slice(0, 10) : '—'}
+              {tenant?.daysLeft != null ? ` · ${tenant.daysLeft}d left` : ''}
+              {tenant?.paymentRef ? ` · ${tenant.paymentRef}` : ''}
+              {tenant?.amount != null ? ` · ₹${Number(tenant.amount).toLocaleString('en-IN')}` : ''}
             </div>
           </div>
         </div>
@@ -200,13 +213,13 @@ export function Billing() {
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
-        {PLANS.map((p) => {
+        {plans.map((p) => {
           const on = tenant?.plan === p.id
           return (
             <button
               key={p.id}
               type="button"
-              disabled={busy || user?.roleCode !== 'super_admin'}
+              disabled={busy || (user?.roleCode !== 'super_admin' && !isPlatformOwner)}
               onClick={() => setPlan(p.id)}
               className={`rounded-2xl border p-4 text-left transition ${
                 on
@@ -216,10 +229,16 @@ export function Billing() {
             >
               <div className="flex items-center gap-2 font-bold text-[var(--text-main)]">
                 <CreditCard className="h-4 w-4 text-indigo-500" />
-                {p.label}
+                {p.name}
               </div>
-              <p className="mt-1 text-[12px] text-[var(--text-muted)]">{p.blurb}</p>
-              <p className="mt-2 font-mono text-[11px] text-[var(--text-dim)]">{p.seats} seats</p>
+              <p className="mt-1 text-[12px] text-[var(--text-muted)]">{p.description}</p>
+              <p className="mt-2 font-mono text-sm font-bold text-[var(--text-main)]">
+                ₹{Number(p.monthlyPrice || 0).toLocaleString('en-IN')}
+                <span className="text-[11px] font-medium text-[var(--text-dim)]"> /mo</span>
+              </p>
+              <p className="font-mono text-[11px] text-[var(--text-dim)]">
+                ₹{Number(p.yearlyPrice || 0).toLocaleString('en-IN')} /yr · {p.seats ?? '—'} seats
+              </p>
               {on ? (
                 <span className="mt-2 inline-block text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-300">
                   Current

@@ -1,10 +1,12 @@
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Dashboard } from './Dashboard'
 import { DepartmentHome } from './DepartmentHome'
 
-/** Super Admin sees live Mongo dashboard. Other roles see their department home. */
+/** Platform owner → SaaS console. Super Admin (tenant) → live dashboard. Others → department home. */
 export function HomeRoute() {
-  const { user } = useAuth()
+  const { user, isPlatformOwner } = useAuth()
+  if (isPlatformOwner) return <Navigate to="/saas" replace />
   if (user?.roleCode === 'super_admin') return <Dashboard />
   return <DepartmentHome />
 }

@@ -7,12 +7,12 @@ import { ToastStack } from './ToastStack'
 
 export function AppShell() {
   return (
-    <div className="rugos-shell flex h-full flex-col bg-[var(--bg-app)]">
+    <div className="rugos-shell flex flex-col bg-[var(--bg-app)] pb-[env(safe-area-inset-bottom)]">
       <Header />
       <div className="relative flex min-h-0 flex-1">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1600px] px-2 py-3 sm:p-4 lg:p-6">
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain">
+          <div className="mx-auto w-full max-w-[1600px] px-3 py-3 sm:p-4 lg:p-6">
             <Outlet />
           </div>
         </main>

@@ -12,7 +12,7 @@ export function RequirePath({ children }: { children: React.ReactNode }) {
     ? { modules: user.tenant.modules, plan: user.tenant.plan }
     : undefined
   if (!canAccessPath(user?.roleCode, path, tenant)) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   return <>{children}</>

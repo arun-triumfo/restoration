@@ -14,6 +14,7 @@ export const ROLES = {
     label: 'India Warehouse Manager',
     menus: [
       '/',
+      '/dashboard',
       '/workflow',
       '/orders',
       '/buyers',
@@ -64,6 +65,7 @@ export const ROLES = {
     label: 'US Warehouse Manager',
     menus: [
       '/',
+      '/dashboard',
       '/workflow',
       '/inventory',
       '/orders',
@@ -93,6 +95,7 @@ export const ROLES = {
     label: 'Finance Manager',
     menus: [
       '/',
+      '/dashboard',
       '/workflow',
       '/orders',
       '/receivables',
@@ -205,4 +208,8 @@ export const PATH_RESOURCE = {
   '/profitability': 'monthly_financials',
   '/reports': 'yearly_financials',
   '/settings': 'roles',
+  '/billing': 'monthly_financials',
+  '/dashboard': 'orders',
+  '/saas': 'tenants',
+  '/tenants': 'tenants',
 }

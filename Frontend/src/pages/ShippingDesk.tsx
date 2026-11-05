@@ -431,8 +431,8 @@ export function ShippingDesk() {
             </label>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="table-scroll">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase text-[var(--text-dim)]">
               <tr>
                 <th className="px-3 py-2">AWB / Tracking</th>

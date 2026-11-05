@@ -649,8 +649,8 @@ export function Orders() {
       </div>
 
       <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-[var(--shadow-sm)]">
-        <div className="flex flex-col gap-3 border-b border-[var(--border-main)] p-3 sm:p-4 lg:flex-row lg:items-center">
-          <label className="relative min-w-0 flex-1">
+        <div className="flex flex-col gap-2 border-b border-[var(--border-main)] p-3 sm:gap-3 sm:p-4 lg:flex-row lg:flex-wrap lg:items-center">
+          <label className="relative min-w-0 w-full flex-1">
             <span className="sr-only">Search orders</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
             <input
@@ -659,8 +659,8 @@ export function Orders() {
                 setQuery(e.target.value)
                 setPage(1)
               }}
-              placeholder="Search ORD-DEMO, buyer, SKU, rug title…"
-              className="h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] pl-10 pr-3 text-sm outline-none focus:border-indigo-500"
+              placeholder="Search ORD, buyer, SKU…"
+              className="h-11 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] pl-10 pr-3 text-sm outline-none focus:border-indigo-500 sm:h-10"
             />
           </label>
           <select
@@ -669,7 +669,7 @@ export function Orders() {
               setChannel(e.target.value)
               setPage(1)
             }}
-            className="h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+            className="h-11 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm sm:h-10 sm:w-auto"
             aria-label="Channel filter"
           >
             <option value="all">All Channels</option>
@@ -685,7 +685,7 @@ export function Orders() {
               setStatus(e.target.value)
               setPage(1)
             }}
-            className="h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm"
+            className="h-11 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 text-sm sm:h-10 sm:w-auto"
             aria-label="Status filter"
           >
             <option value="all">All Statuses</option>
@@ -742,8 +742,8 @@ export function Orders() {
           </span>
         </div>
 
-        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 sm:mx-0 sm:px-0">
-          <table className="w-full min-w-[920px] text-left text-sm md:min-w-[1100px]">
+        <div className="table-scroll -mx-1 overscroll-x-contain px-1 sm:mx-0 sm:px-0">
+          <table className="w-full min-w-[720px] text-left text-sm sm:min-w-[920px] md:min-w-[1100px]">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
               <tr>
                 <th className="px-4 py-3 font-semibold">Product (from inventory)</th>

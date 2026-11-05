@@ -71,13 +71,42 @@ interface ItemResponse {
 export type TenantDto = {
   id: string
   name: string
+  companyName?: string
   slug: string
+  contactName?: string
+  email?: string
+  phone?: string
   plan: string
   planLabel?: string
   seats?: number
   modules?: string[]
+  status?: string
   billingStatus?: string
+  billingCycle?: string
+  amount?: number | null
+  currency?: string
+  paymentRef?: string
   renewsAt?: string | null
+  daysLeft?: number | null
+  expiresSoon?: boolean
+  expired?: boolean
+  activatedAt?: string | null
+  businessMode?: string | null
+  notes?: string
+  createdAt?: string
+}
+
+export type SaasPlanDto = {
+  id: string
+  name: string
+  description: string
+  monthlyPrice: number
+  yearlyPrice: number
+  currency: string
+  popular?: boolean
+  active?: boolean
+  features: string[]
+  seats?: number
 }
 
 export type AuthUserDto = {
@@ -88,6 +117,7 @@ export type AuthUserDto = {
   tenantId: string
   tenant?: TenantDto
   status?: string
+  isPlatformOwner?: boolean
   menus?: string[]
   permissions?: { resources: string[]; actions: string[] }
 }
@@ -143,7 +173,12 @@ export const api = {
     request<{ success: boolean; resources: number; database?: string; auth?: string }>('/health'),
 
   login: (email: string, password: string) =>
-    request<{ success: boolean; token: string; user: AuthUserDto }>('/auth/login', {
+    request<{
+      success: boolean
+      token: string
+      user: AuthUserDto
+      redirectTo?: string
+    }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
@@ -153,6 +188,33 @@ export const api = {
   logout: () => request<{ success: boolean }>('/auth/logout', { method: 'POST' }),
 
   platform: {
+    listPlans: () =>
+      request<{ success: boolean; data: SaasPlanDto[] }>('/platform/plans'),
+    subscribe: (payload: Record<string, unknown>) =>
+      request<{ success: boolean; tenant: TenantDto; message?: string }>(
+        '/platform/subscribe',
+        { method: 'POST', body: JSON.stringify(payload) },
+      ),
+    requestDemo: (payload: Record<string, unknown>) =>
+      request<{ success: boolean; data?: ResourceRow; message?: string }>(
+        '/platform/demo-requests',
+        { method: 'POST', body: JSON.stringify(payload) },
+      ),
+    overview: () =>
+      request<{
+        success: boolean
+        data: {
+          totalTenants: number
+          active: number
+          pending: number
+          expiringSoon: number
+          suspendedOrExpired: number
+          pendingDemos: number
+          estimatedMrrInr: number
+          expiring: TenantDto[]
+          pendingBuyers: TenantDto[]
+        }
+      }>('/platform/overview'),
     listTenants: () =>
       request<{ success: boolean; count: number; data: TenantDto[] }>('/platform/tenants'),
     createTenant: (payload: Record<string, unknown>) =>
@@ -167,6 +229,30 @@ export const api = {
       request<{ success: boolean; tenant: TenantDto }>(
         `/platform/tenants/${encodeURIComponent(tenantId)}`,
         { method: 'PATCH', body: JSON.stringify(payload) },
+      ),
+    activateTenant: (tenantId: string, payload?: Record<string, unknown>) =>
+      request<{
+        success: boolean
+        tenant: TenantDto
+        admin?: { email: string; tempPassword: string } | null
+        message?: string
+      }>(`/platform/tenants/${encodeURIComponent(tenantId)}/activate`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      }),
+    suspendTenant: (tenantId: string) =>
+      request<{ success: boolean; tenant: TenantDto; message?: string }>(
+        `/platform/tenants/${encodeURIComponent(tenantId)}/suspend`,
+        { method: 'POST', body: '{}' },
+      ),
+    listDemoRequests: () =>
+      request<{ success: boolean; count: number; data: ResourceRow[] }>(
+        '/platform/demo-requests',
+      ),
+    updateDemoRequest: (id: string, status: string) =>
+      request<{ success: boolean; data: ResourceRow }>(
+        `/platform/demo-requests/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify({ status }) },
       ),
   },
 

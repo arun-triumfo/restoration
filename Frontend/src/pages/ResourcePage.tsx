@@ -245,8 +245,8 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
           </span>
         </div>
 
-        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 sm:mx-0 sm:px-0">
-          <table className="w-full min-w-[640px] text-left text-sm sm:min-w-[900px]">
+        <div className="table-scroll -mx-1 overscroll-x-contain px-1 sm:mx-0 sm:px-0">
+          <table className="w-full min-w-[560px] text-left text-sm sm:min-w-[900px]">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
               <tr>
                 {tableCols.map((c) => (

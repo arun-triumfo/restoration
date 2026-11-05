@@ -20,14 +20,18 @@ async function tenantPublic(tenantId) {
   const planMeta = PLANS[plan] || PLANS.enterprise
   return {
     id: tid,
-    name: doc?.name || 'Restoration Rugs / Odette',
+    name: doc?.name || doc?.companyName || 'Restoration Rugs / Odette',
     slug: doc?.slug || 'restoration',
     plan,
     planLabel: planMeta.label,
     seats: doc?.seats ?? planMeta.seats,
     modules: doc?.modules?.length ? doc.modules : planMeta.modules,
     billingStatus: doc?.billingStatus || 'active',
+    billingCycle: doc?.billingCycle || 'monthly',
+    amount: doc?.amount ?? null,
+    paymentRef: doc?.paymentRef || '',
     renewsAt: doc?.renewsAt || null,
+    status: doc?.status || 'active',
   }
 }
 
@@ -77,14 +81,56 @@ export async function login(req, res) {
     }
 
     const profile = await publicUser(user)
+    const isPlatformOwner =
+      profile.roleCode === 'super_admin' &&
+      (profile.tenantId === DEFAULT_TENANT_ID || Boolean(user.isPlatformOwner))
+
+    // SaaS gate: non-platform tenants need active billing + valid renew date
+    if (!isPlatformOwner) {
+      const billing = String(profile.tenant?.billingStatus || 'active').toLowerCase()
+      if (['suspended', 'canceled', 'cancelled', 'unpaid', 'pending'].includes(billing)) {
+        return res.status(402).json({
+          success: false,
+          message: `Subscription is ${billing}. Contact RugOS support or renew on Billing.`,
+          billingStatus: billing,
+        })
+      }
+      const renewsAt = profile.tenant?.renewsAt
+      if (renewsAt) {
+        const end = new Date(renewsAt).getTime()
+        if (!Number.isNaN(end) && end < Date.now()) {
+          return res.status(402).json({
+            success: false,
+            message: 'Subscription expired. Please renew to continue using RugOS.',
+            billingStatus: 'expired',
+            renewsAt,
+          })
+        }
+      }
+      const tenantStatus = String(profile.tenant?.status || 'active').toLowerCase()
+      if (tenantStatus.includes('pending') || tenantStatus === 'suspended') {
+        return res.status(402).json({
+          success: false,
+          message: 'Company account is not active yet. Platform owner must activate your subscription.',
+          billingStatus: tenantStatus,
+        })
+      }
+    }
+
     const token = signToken({
       email: profile.email,
       name: profile.name,
       roleCode: profile.roleCode,
       tenantId: profile.tenantId,
+      isPlatformOwner,
     })
 
-    res.json({ success: true, token, user: profile })
+    res.json({
+      success: true,
+      token,
+      user: { ...profile, isPlatformOwner },
+      redirectTo: isPlatformOwner ? '/saas' : '/dashboard',
+    })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
   }
@@ -96,7 +142,11 @@ export async function me(req, res) {
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found' })
     }
-    res.json({ success: true, user: await publicUser(user) })
+    const profile = await publicUser(user)
+    const isPlatformOwner =
+      profile.roleCode === 'super_admin' &&
+      (profile.tenantId === DEFAULT_TENANT_ID || Boolean(user.isPlatformOwner))
+    res.json({ success: true, user: { ...profile, isPlatformOwner } })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
   }

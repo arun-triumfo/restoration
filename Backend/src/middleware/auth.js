@@ -18,6 +18,7 @@ export function authenticate(req, res, next) {
       name: 'Dev Bypass',
       roleCode: 'super_admin',
       tenantId: DEFAULT_TENANT_ID,
+      isPlatformOwner: true,
     }
     return next()
   }
@@ -34,6 +35,7 @@ export function authenticate(req, res, next) {
       name: decoded.name,
       roleCode: normalizeRoleCode(decoded.roleCode),
       tenantId: decoded.tenantId || DEFAULT_TENANT_ID,
+      isPlatformOwner: Boolean(decoded.isPlatformOwner),
     }
     return next()
   } catch {

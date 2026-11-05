@@ -14,11 +14,13 @@ import { DemandForecast } from './pages/DemandForecast'
 import { HomeRoute } from './pages/HomeRoute'
 import { IntegrationsHub } from './pages/IntegrationsHub'
 import { Inventory } from './pages/Inventory'
+import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { MtoJobs } from './pages/MtoJobs'
 import { Orders } from './pages/Orders'
 import { PackingStation } from './pages/PackingStation'
 import { ResourcePage } from './pages/ResourcePage'
+import { SaasOwner } from './pages/SaasOwner'
 import { ShippingDesk } from './pages/ShippingDesk'
 import { SystemWorkflow } from './pages/SystemWorkflow'
 import { TenantsAdmin } from './pages/TenantsAdmin'
@@ -31,6 +33,7 @@ const NATIVE_PATHS = new Set([
   '/integrations',
   '/billing',
   '/tenants',
+  '/saas',
   '/shipping',
   '/packing',
   '/buy-sheet',
@@ -42,6 +45,7 @@ const NATIVE_PATHS = new Set([
   '/orders',
   '/inventory',
   '/mto',
+  '/dashboard',
 ])
 
 /** Prefer live Mongo CRUD tables over wireframe for client add/edit/delete */
@@ -64,6 +68,7 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            <Route index element={<Landing />} />
             <Route path="login" element={<Login />} />
             <Route
               element={
@@ -74,7 +79,7 @@ export default function App() {
                 </RequireAuth>
               }
             >
-              <Route index element={<HomeRoute />} />
+              <Route path="dashboard" element={<HomeRoute />} />
               <Route path="workflow" element={<SystemWorkflow />} />
               <Route
                 path="integrations"
@@ -89,6 +94,14 @@ export default function App() {
                 element={
                   <RequirePath>
                     <Billing />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="saas"
+                element={
+                  <RequirePath>
+                    <SaasOwner />
                   </RequirePath>
                 }
               />
@@ -202,7 +215,7 @@ export default function App() {
                   }
                 />
               ))}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>
         </BrowserRouter>

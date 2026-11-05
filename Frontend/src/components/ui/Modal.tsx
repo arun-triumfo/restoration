@@ -34,7 +34,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className={`flex max-h-[92dvh] w-full flex-col rounded-t-2xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-xl sm:max-h-[90vh] sm:rounded-2xl ${
+        className={`flex max-h-[min(92dvh,100%)] w-full flex-col rounded-t-2xl border border-[var(--border-main)] bg-[var(--bg-card)] pb-[env(safe-area-inset-bottom)] shadow-xl sm:max-h-[90vh] sm:rounded-2xl sm:pb-0 ${
           size === 'lg' ? 'sm:max-w-2xl' : 'sm:max-w-lg'
         }`}
         onClick={(e) => e.stopPropagation()}

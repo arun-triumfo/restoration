@@ -218,9 +218,14 @@
 }
 
 html,
-body,
-#root {
+body {
   height: 100%;
+}
+
+/* Grow with public pages (landing/login); app shell locks its own viewport */
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
 }
 
 body {
@@ -229,7 +234,48 @@ body {
   background: var(--bg-app);
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rugos-shell {
+  height: 100dvh;
+  max-height: 100dvh;
   overflow: hidden;
+}
+
+.rugos-public {
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* Horizontal tables on phones — swipe hint */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 639px) {
+  .table-scroll {
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .table-scroll::after {
+    content: '← swipe →';
+    display: block;
+    padding: 0.35rem 0.5rem 0.15rem;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: center;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -291,5 +337,83 @@ body {
   .wf-root #moduleQuickActions .btn {
     flex: 1 1 auto;
     min-height: 36px;
+  }
+}
+
+/* Phone: denser page titles, full-width primary actions */
+@media (max-width: 639px) {
+  .rugos-shell main h1 {
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+
+  .landing-input {
+    min-height: 2.75rem;
+    font-size: 16px; /* avoid iOS zoom on focus */
+  }
+}
+
+/* Landing — same trade-route theme as Tms1.0/Rugos */
+@layer components {
+  .landing-root {
+    --lp-ink: #0f2744;
+    --lp-muted: #5b6b7c;
+    --lp-accent: #0e7490;
+    --lp-accent-deep: #0f5f6e;
+    --lp-sand: #f7f4ef;
+    --lp-sky: #e8f4f8;
+    --lp-line: #d5dde6;
+    font-family: "DM Sans", var(--font-sans);
+    color: var(--lp-ink);
+    background:
+      radial-gradient(ellipse 90% 55% at 12% -10%, #cfeef5 0%, transparent 55%),
+      radial-gradient(ellipse 70% 45% at 95% 8%, #fde8d8 0%, transparent 50%),
+      linear-gradient(180deg, #f4fafb 0%, var(--lp-sand) 42%, #eef6f8 100%);
+  }
+
+  .landing-display {
+    font-family: "Fraunces", Georgia, serif;
+    letter-spacing: -0.02em;
+  }
+
+  .landing-fade-up {
+    animation: landingFadeUp 0.7s ease-out both;
+  }
+
+  .landing-fade-up-delay {
+    animation: landingFadeUp 0.75s ease-out 0.12s both;
+  }
+
+  .landing-fade-up-delay-2 {
+    animation: landingFadeUp 0.8s ease-out 0.22s both;
+  }
+
+  .landing-float {
+    animation: landingFloat 5.5s ease-in-out infinite;
+  }
+
+  .landing-input {
+    @apply w-full rounded-lg border border-[#d5dde6] bg-white px-3 py-2.5 text-sm text-[#0f2744] outline-none transition placeholder:text-slate-400 focus:border-[#0e7490] focus:ring-2 focus:ring-[#0e7490]/20;
+  }
+}
+
+@keyframes landingFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landingFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
   }
 }

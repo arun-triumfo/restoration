@@ -8,7 +8,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'START HERE',
     items: [
       { label: 'System Workflow', path: '/workflow', icon: 'GitBranch' },
-      { label: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
+      { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard' },
     ],
   },
   {
@@ -78,6 +78,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: '8 · SAAS ADMIN',
     items: [
+      { label: 'SaaS Console', path: '/saas', icon: 'ShieldCheck' },
       { label: 'Billing', path: '/billing', icon: 'CreditCard' },
       { label: 'Tenants', path: '/tenants', icon: 'Building2' },
     ],

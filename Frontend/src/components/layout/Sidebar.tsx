@@ -75,7 +75,7 @@ const ICONS: Record<string, LucideIcon> = {
 
 export function Sidebar() {
   const { sidebarCollapsed, mobileNavOpen, setMobileNavOpen } = useApp()
-  const { user } = useAuth()
+  const { user, isPlatformOwner } = useAuth()
 
   const sections = useMemo(() => {
     const tenant = user?.tenant
@@ -83,23 +83,28 @@ export function Sidebar() {
       : undefined
     return NAV_SECTIONS.map((section) => ({
       ...section,
-      items: section.items.filter((item) => canAccessPath(user?.roleCode, item.path, tenant)),
+      items: section.items.filter((item) => {
+        if ((item.path === '/saas' || item.path === '/tenants') && !isPlatformOwner) {
+          return false
+        }
+        return canAccessPath(user?.roleCode, item.path, tenant)
+      }),
     })).filter((section) => section.items.length > 0)
-  }, [user?.roleCode, user?.tenant])
+  }, [user?.roleCode, user?.tenant, isPlatformOwner])
 
   return (
     <>
       {mobileNavOpen ? (
         <button
           type="button"
-          className="fixed inset-0 top-16 z-40 bg-slate-950/45 lg:hidden"
+          className="fixed inset-0 top-14 z-40 bg-slate-950/45 sm:top-16 lg:hidden"
           aria-label="Close navigation overlay"
           onClick={() => setMobileNavOpen(false)}
         />
       ) : null}
 
       <aside
-        className={`rugos-sidebar fixed bottom-0 left-0 top-16 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-[var(--border-main)] bg-[var(--bg-sidebar)] shadow-xl transition-transform duration-200 lg:static lg:top-auto lg:z-0 lg:h-auto lg:w-64 lg:translate-x-0 lg:shadow-none lg:pointer-events-auto ${
+        className={`rugos-sidebar fixed bottom-0 left-0 top-14 z-50 flex w-[min(18rem,92vw)] flex-col border-r border-[var(--border-main)] bg-[var(--bg-sidebar)] pb-[env(safe-area-inset-bottom)] shadow-xl transition-transform duration-200 sm:top-16 lg:static lg:top-auto lg:z-0 lg:h-auto lg:w-64 lg:translate-x-0 lg:pb-0 lg:shadow-none lg:pointer-events-auto ${
           mobileNavOpen
             ? 'translate-x-0 pointer-events-auto'
             : '-translate-x-full pointer-events-none lg:pointer-events-auto'

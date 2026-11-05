@@ -18,35 +18,38 @@ export function Header() {
 
   const handleLogout = () => {
     logout()
-    navigate('/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   return (
-    <header className="z-50 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-main)] bg-[var(--bg-header)] px-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="z-50 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-[var(--border-main)] bg-[var(--bg-header)] px-2 pt-[env(safe-area-inset-top)] sm:h-16 sm:gap-3 sm:px-5">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <Button
           variant="secondary"
           size="sm"
-          className="!h-9 !w-9 !px-0"
+          className="!h-10 !w-10 !px-0 lg:!h-9 lg:!w-9"
           onClick={toggleSidebar}
-          aria-label="Toggle Sidebar"
-          title="Toggle Sidebar"
+          aria-label="Open menu"
+          title="Open menu"
         >
           <Menu className="h-4 w-4" />
         </Button>
 
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
           <img
             src="https://www.odetterugs.com/cdn/shop/files/Odette-Rugs-Fave-IconOdette-Rugs-Fave-Icon_1.png?crop=center&height=32&v=1754630107&width=32"
             alt="Odette Rugs"
-            className="h-7 w-7 rounded-md object-contain"
+            className="h-7 w-7 shrink-0 rounded-md object-contain"
           />
-          <div className="hidden min-w-0 sm:block">
-            <p className="truncate text-[15px] font-extrabold tracking-tight text-[var(--text-main)]">
-              {user?.tenant?.name || 'Odette Rugs'}{' '}
-              <span className="text-cyan-600 dark:text-cyan-400">/ RugOS</span>
+          <div className="min-w-0 max-w-[42vw] xs:max-w-none sm:max-w-none">
+            <p className="truncate text-[13px] font-extrabold tracking-tight text-[var(--text-main)] sm:text-[15px]">
+              <span className="sm:hidden">RugOS</span>
+              <span className="hidden sm:inline">
+                {user?.tenant?.name || 'Odette Rugs'}{' '}
+                <span className="text-cyan-600 dark:text-cyan-400">/ RugOS</span>
+              </span>
             </p>
-            <p className="truncate text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+            <p className="truncate text-[9px] font-medium uppercase tracking-wider text-[var(--text-muted)] sm:text-[10px]">
               {user?.tenant?.planLabel || user?.tenant?.plan || 'plan'} ·{' '}
               {user?.tenant?.billingStatus || 'active'}
             </p>

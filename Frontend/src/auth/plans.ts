@@ -2,6 +2,7 @@
 
 export const PATH_MODULE: Record<string, string> = {
   '/': 'core',
+  '/dashboard': 'core',
   '/workflow': 'core',
   '/inventory': 'inventory',
   '/warehouses': 'inventory',
@@ -33,6 +34,7 @@ export const PATH_MODULE: Record<string, string> = {
   '/users': 'core',
   '/billing': 'core',
   '/tenants': 'core',
+  '/saas': 'core',
   '/settings': 'core',
   '/system-logs': 'core',
   '/currencies': 'core',

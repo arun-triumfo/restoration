@@ -707,8 +707,8 @@ export function Inventory() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[1200px] w-full text-left text-sm">
+        <div className="table-scroll">
+          <table className="min-w-[720px] w-full text-left text-sm sm:min-w-[960px] lg:min-w-[1100px]">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
               <tr>
                 <th className="px-4 py-3 font-semibold">SKU & Thumbnail</th>

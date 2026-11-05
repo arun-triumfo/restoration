@@ -91,6 +91,7 @@ async function main() {
 
   const User = getResourceModel('users', 'email', true)
   for (const u of DEMO_USERS) {
+    const roleCode = u.roleCode || normalizeRoleCode(u.role)
     await User.findOneAndUpdate(
       { email: u.email },
       {
@@ -98,17 +99,18 @@ async function main() {
           email: u.email,
           name: u.name,
           role: u.role,
-          roleCode: u.roleCode || normalizeRoleCode(u.role),
+          roleCode,
           status: 'Active',
           tenantId: DEFAULT_TENANT_ID,
           passwordHash,
           whAccess: 'As per role',
           perm: 'Role-based',
+          isPlatformOwner: roleCode === 'super_admin',
         },
       },
       { upsert: true, new: true },
     )
-    console.log('User upserted:', u.email, '→', u.roleCode)
+    console.log('User upserted:', u.email, '→', roleCode)
   }
 
   for (const email of LEGACY_DEACTIVATE) {

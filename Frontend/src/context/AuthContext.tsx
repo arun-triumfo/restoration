@@ -20,6 +20,7 @@ export type AuthUser = {
   tenantId: string
   tenant?: TenantDto
   status?: string
+  isPlatformOwner?: boolean
   menus?: string[]
   permissions?: {
     resources: string[]
@@ -31,9 +32,10 @@ type AuthContextValue = {
   user: AuthUser | null
   token: string | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<{ redirectTo?: string }>
   logout: () => void
   refreshMe: () => Promise<void>
+  isPlatformOwner: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -84,12 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({
       ...res.user,
       roleCode: normalizeRoleCode(String(res.user.roleCode || res.user.role)),
+      isPlatformOwner: Boolean(res.user.isPlatformOwner),
     })
+    return { redirectTo: res.redirectTo }
   }, [])
 
+  const isPlatformOwner = Boolean(user?.isPlatformOwner)
+
   const value = useMemo(
-    () => ({ user, token, loading, login, logout, refreshMe }),
-    [user, token, loading, login, logout, refreshMe],
+    () => ({ user, token, loading, login, logout, refreshMe, isPlatformOwner }),
+    [user, token, loading, login, logout, refreshMe, isPlatformOwner],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

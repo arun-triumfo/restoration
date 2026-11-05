@@ -1,5 +1,6 @@
 import { Building2, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError, type TenantDto } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/Button'
@@ -82,10 +83,17 @@ export function TenantsAdmin() {
         </p>
         <h1 className="text-2xl font-extrabold text-[var(--text-main)]">Platform tenants</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Create a new company — first Super Admin gets a temporary password. Data stays isolated per
-          company.
+          Quick create a company + admin. For payments, validity and activation use the{' '}
+          <Link to="/saas" className="font-bold text-indigo-600 underline">
+            SaaS Console
+          </Link>
+          .
         </p>
       </header>
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
+        Owner workflow: Landing purchase → <strong>SaaS Console → Activate</strong> → company users
+        can log in until renewsAt. Expiring / suspended companies are blocked at login.
+      </div>
 
       {error ? (
         <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">

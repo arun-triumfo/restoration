@@ -381,7 +381,7 @@ export function Dashboard() {
             </Button>
           </Link>
         </div>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--bg-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
               <tr>

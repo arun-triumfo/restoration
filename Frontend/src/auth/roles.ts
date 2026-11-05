@@ -30,6 +30,7 @@ export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
   super_admin: ['*'],
   india_wh: [
     '/',
+    '/dashboard',
     '/workflow',
     '/orders',
     '/buyers',
@@ -55,6 +56,7 @@ export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
   ],
   usa_wh: [
     '/',
+    '/dashboard',
     '/workflow',
     '/inventory',
     '/orders',
@@ -69,6 +71,7 @@ export const ROLE_MENUS: Record<RoleCode, string[] | ['*']> = {
   ],
   finance: [
     '/',
+    '/dashboard',
     '/workflow',
     '/orders',
     '/receivables',
@@ -95,7 +98,13 @@ export function canAccessPath(
   const roleOk =
     (menus as string[]).includes('*') || path === '/workflow' || (menus as string[]).includes(path)
   if (!roleOk) return false
-  if (path === '/workflow' || path === '/billing' || path === '/login') return true
+  if (path === '/workflow' || path === '/billing' || path === '/login' || path === '/dashboard') {
+    return true
+  }
+  // SaaS owner console — Super Admin / platform owner only (* menu)
+  if (path === '/saas') {
+    return (menus as string[]).includes('*')
+  }
   return planAllowsPath(tenant?.modules, tenant?.plan, path)
 }
 

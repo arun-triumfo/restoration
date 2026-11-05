@@ -4,6 +4,7 @@
  */
 export const RESOURCES = {
   tenants: { idField: 'id', label: 'Tenants' },
+  demo_requests: { idField: 'id', label: 'Demo Requests', unique: false },
   skus: { idField: 'sku', label: 'SKUs' },
   orders: { idField: 'orderId', label: 'Orders' },
   warehouses: { idField: 'id', label: 'Warehouses' },
