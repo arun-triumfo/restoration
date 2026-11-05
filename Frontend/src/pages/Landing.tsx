@@ -185,8 +185,12 @@ export function Landing() {
     setLoginError('')
     setLoginBusy(true)
     try {
-      const res = await login('admin@restoration.com', DEMO_PASSWORD)
-      navigate(res.redirectTo || '/saas', { replace: true })
+      const res = await login('india@restoration.com', DEMO_PASSWORD)
+      if (res.isPlatformOwner) {
+        navigate('/saas', { replace: true })
+        return
+      }
+      navigate(res.redirectTo || '/dashboard', { replace: true })
     } catch (err) {
       setLoginError(err instanceof ApiError ? err.message : 'Could not launch demo')
     } finally {
@@ -219,6 +223,18 @@ export function Landing() {
             </a>
           </nav>
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link
+              to="/login/company"
+              className="hidden rounded-lg px-2.5 py-1.5 text-sm font-medium text-[#0f2744] hover:bg-[#0f2744]/5 sm:inline-block sm:px-3"
+            >
+              Company
+            </Link>
+            <Link
+              to="/login/owner"
+              className="hidden rounded-lg px-2.5 py-1.5 text-sm font-medium text-[#0f2744] hover:bg-[#0f2744]/5 sm:inline-block sm:px-3"
+            >
+              Owner
+            </Link>
             <Link
               to="/login"
               className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-[#0f2744] hover:bg-[#0f2744]/5 sm:px-3"
@@ -529,26 +545,38 @@ export function Landing() {
           <div>
             <h2 className="landing-display text-2xl font-semibold sm:text-3xl">View product demo</h2>
             <p className="mt-2 max-w-xl text-sm text-slate-300">
-              Launch the live ops demo (Orders, Inventory racks, MTO, Shipping) with the platform
-              admin account.
+              Company ops (India WH → Orders, Inventory, MTO, Shipping) or Platform Owner SaaS
+              console — separate logins.
             </p>
             {loginError ? <p className="mt-2 text-sm text-red-300">{loginError}</p> : null}
           </div>
-          <button
-            type="button"
-            disabled={loginBusy}
-            onClick={() => void launchOps()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0e7490] px-5 py-3 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-60"
-          >
-            {loginBusy ? 'Opening…' : 'Open ops demo'} <ArrowRight size={16} />
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              disabled={loginBusy}
+              onClick={() => void launchOps()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0e7490] px-5 py-3 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-60"
+            >
+              {loginBusy ? 'Opening…' : 'Open company ops'} <ArrowRight size={16} />
+            </button>
+            <Link
+              to="/login/owner"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Owner SaaS login
+            </Link>
+          </div>
         </div>
       </section>
 
       <footer className="border-t border-[#d5dde6]/80 py-8 text-center text-xs text-[#5b6b7c]">
         RugOS / ExportOS · Subscription SaaS ·{' '}
-        <Link to="/login" className="font-semibold text-[#0e7490] hover:underline">
-          Sign in
+        <Link to="/login/company" className="font-semibold text-[#0e7490] hover:underline">
+          Company sign-in
+        </Link>
+        {' · '}
+        <Link to="/login/owner" className="font-semibold text-indigo-700 hover:underline">
+          Owner (SaaS)
         </Link>
       </footer>
 

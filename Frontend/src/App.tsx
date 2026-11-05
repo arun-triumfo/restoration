@@ -16,7 +16,9 @@ import { IntegrationsHub } from './pages/IntegrationsHub'
 import { Inventory } from './pages/Inventory'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
+import { LoginHub } from './pages/LoginHub'
 import { MtoJobs } from './pages/MtoJobs'
+import { OwnerLogin } from './pages/OwnerLogin'
 import { Orders } from './pages/Orders'
 import { PackingStation } from './pages/PackingStation'
 import { ResourcePage } from './pages/ResourcePage'
@@ -69,7 +71,9 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route index element={<Landing />} />
-            <Route path="login" element={<Login />} />
+            <Route path="login" element={<LoginHub />} />
+            <Route path="login/owner" element={<OwnerLogin />} />
+            <Route path="login/company" element={<Login />} />
             <Route
               element={
                 <RequireAuth>

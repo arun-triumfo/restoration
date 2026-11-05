@@ -32,7 +32,10 @@ type AuthContextValue = {
   user: AuthUser | null
   token: string | null
   loading: boolean
-  login: (email: string, password: string) => Promise<{ redirectTo?: string }>
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ redirectTo?: string; isPlatformOwner: boolean }>
   logout: () => void
   refreshMe: () => Promise<void>
   isPlatformOwner: boolean
@@ -80,15 +83,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.login(email, password)
+    const owner = Boolean(res.user.isPlatformOwner)
     localStorage.setItem(TOKEN_KEY, res.token)
     setAuthToken(res.token)
     setToken(res.token)
     setUser({
       ...res.user,
       roleCode: normalizeRoleCode(String(res.user.roleCode || res.user.role)),
-      isPlatformOwner: Boolean(res.user.isPlatformOwner),
+      isPlatformOwner: owner,
     })
-    return { redirectTo: res.redirectTo }
+    return { redirectTo: res.redirectTo, isPlatformOwner: owner }
   }, [])
 
   const isPlatformOwner = Boolean(user?.isPlatformOwner)

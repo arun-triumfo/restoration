@@ -108,8 +108,15 @@ export function canAccessPath(
   return planAllowsPath(tenant?.modules, tenant?.plan, path)
 }
 
+/** Platform owner demo — use /login/owner only */
+export const OWNER_DEMO = {
+  email: 'admin@restoration.com',
+  role: 'Platform Owner',
+  roleCode: 'super_admin' as RoleCode,
+}
+
+/** Company (tenant) demos — use /login/company only */
 export const DEMO_ACCOUNTS = [
-  { email: 'admin@restoration.com', role: 'Super Admin', roleCode: 'super_admin' as RoleCode },
   {
     email: 'india@restoration.com',
     role: 'India Warehouse Manager',

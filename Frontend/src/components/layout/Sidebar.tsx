@@ -81,10 +81,14 @@ export function Sidebar() {
     const tenant = user?.tenant
       ? { modules: user.tenant.modules, plan: user.tenant.plan }
       : undefined
+    const ownerOnly = new Set(['/saas', '/tenants', '/billing', '/workflow'])
     return NAV_SECTIONS.map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        if ((item.path === '/saas' || item.path === '/tenants') && !isPlatformOwner) {
+        if (isPlatformOwner) {
+          return ownerOnly.has(item.path)
+        }
+        if (item.path === '/saas' || item.path === '/tenants') {
           return false
         }
         return canAccessPath(user?.roleCode, item.path, tenant)
