@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { addBillingPeriod, planPublicList, PLANS } from '../constants/plans.js'
 import { DEFAULT_TENANT_ID } from '../constants/tenant.js'
+import { createCheckout, verifyPayment } from '../integrations/adapters/razorpay.js'
 import { getResourceModel } from '../models/createResourceModel.js'
 
 function Tenant() {
@@ -49,7 +50,7 @@ function publicTenant(doc) {
     billingStatus: doc.billingStatus || 'active',
     billingCycle: doc.billingCycle || 'monthly',
     amount: doc.amount ?? null,
-    currency: doc.currency || planMeta.currency || 'INR',
+    currency: doc.currency || planMeta.currency || 'USD',
     paymentRef: doc.paymentRef || '',
     renewsAt,
     daysLeft,
@@ -161,7 +162,7 @@ export async function requestSubscription(req, res) {
       billingStatus: 'pending',
       billingCycle: cycle,
       amount,
-      currency: planMeta.currency || 'INR',
+      currency: planMeta.currency || 'USD',
       paymentRef,
       renewsAt: null,
       activatedAt: null,
@@ -412,7 +413,7 @@ export async function createTenant(req, res) {
       billingStatus: 'active',
       billingCycle: cycle,
       amount,
-      currency: planMeta.currency || 'INR',
+      currency: planMeta.currency || 'USD',
       paymentRef: `PAY-MANUAL-${Date.now()}`,
       renewsAt,
       activatedAt: new Date().toISOString(),
@@ -517,6 +518,182 @@ export async function getMyTenant(req, res) {
 }
 
 /** SaaS owner summary cards */
+function razorpayEnv() {
+  const keyId = String(process.env.RAZORPAY_KEY_ID || '').trim()
+  const keySecret = String(process.env.RAZORPAY_KEY_SECRET || '').trim()
+  if (!keyId.startsWith('rzp_') || keyId.includes('your_key') || !keySecret || keySecret.includes('your_test')) {
+    const err = new Error(
+      'Razorpay test keys are not set. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in Backend/.env (Test mode).',
+    )
+    err.status = 503
+    throw err
+  }
+  return { keyId, keySecret, currency: 'USD' }
+}
+
+async function openRazorpayOrder(fields, { amountUsd, receipt, notes }) {
+  try {
+    const order = await createCheckout(fields, {
+      amount: amountUsd,
+      currency: 'USD',
+      receipt,
+      notes,
+    })
+    return { ...order, chargedAmount: amountUsd, chargedCurrency: 'USD' }
+  } catch (err) {
+    const msg = String(err.message || '')
+    if (!/currency|international/i.test(msg)) throw err
+    const inr = Math.max(1, Math.round(Number(amountUsd) * 83))
+    const order = await createCheckout(fields, {
+      amount: inr,
+      currency: 'INR',
+      receipt,
+      notes: { ...notes, displayCurrency: 'USD', displayAmount: String(amountUsd) },
+    })
+    return { ...order, chargedAmount: inr, chargedCurrency: 'INR' }
+  }
+}
+
+/** Public — create a pending company + Razorpay test order (prices are USD). */
+export async function createSubscriptionCheckout(req, res) {
+  try {
+    const companyName = String(req.body?.companyName || '').trim()
+    const contactName = String(req.body?.contactName || '').trim()
+    const email = String(req.body?.email || '')
+      .trim()
+      .toLowerCase()
+    const phone = String(req.body?.phone || '').trim()
+    const plan = String(req.body?.planId || req.body?.plan || 'starter').toLowerCase()
+    const cycle = req.body?.billingCycle === 'yearly' ? 'yearly' : 'monthly'
+
+    if (!companyName || !contactName || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'companyName, contactName and email are required',
+      })
+    }
+    if (!PLANS[plan]) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid plan. Use: ${Object.keys(PLANS).join(', ')}`,
+      })
+    }
+
+    const fields = razorpayEnv()
+    const planMeta = PLANS[plan]
+    const amountUsd = cycle === 'yearly' ? planMeta.yearlyPrice : planMeta.monthlyPrice
+    const slug = companyName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 40)
+    const id = `tenant-${slug}-${Date.now().toString(36).slice(-4)}`
+    const receipt = `rugos-${id}`.slice(0, 40)
+
+    const order = await openRazorpayOrder(fields, {
+      amountUsd,
+      receipt,
+      notes: {
+        tenantId: id,
+        plan,
+        billingCycle: cycle,
+        email,
+      },
+    })
+
+    await Tenant().create({
+      id,
+      name: companyName,
+      companyName,
+      slug: id.replace(/^tenant-/, ''),
+      contactName,
+      email,
+      phone,
+      plan,
+      seats: planMeta.seats,
+      modules: [...planMeta.modules],
+      status: 'Pending Payment',
+      billingStatus: 'unpaid',
+      billingCycle: cycle,
+      amount: amountUsd,
+      currency: 'USD',
+      paymentRef: order.orderId,
+      renewsAt: null,
+      activatedAt: null,
+      businessMode: null,
+      notes: 'Razorpay checkout started — payment not confirmed',
+      tenantId: id,
+    })
+
+    res.status(201).json({
+      success: true,
+      keyId: fields.keyId,
+      orderId: order.orderId,
+      amount: order.amount,
+      currency: order.currency,
+      chargedAmount: order.chargedAmount,
+      chargedCurrency: order.chargedCurrency,
+      displayAmount: amountUsd,
+      displayCurrency: 'USD',
+      tenantId: id,
+      plan,
+      billingCycle: cycle,
+      mode: fields.keyId.startsWith('rzp_test_') ? 'test' : 'live',
+    })
+  } catch (err) {
+    res.status(err.status || 500).json({ success: false, message: err.message })
+  }
+}
+
+/** Public — confirm Razorpay payment signature and mark the company paid. */
+export async function verifySubscriptionPayment(req, res) {
+  try {
+    const tenantId = String(req.body?.tenantId || '').trim()
+    const orderId = String(req.body?.razorpay_order_id || req.body?.orderId || '').trim()
+    const paymentId = String(req.body?.razorpay_payment_id || req.body?.paymentId || '').trim()
+    const signature = String(req.body?.razorpay_signature || req.body?.signature || '').trim()
+    if (!tenantId || !orderId || !paymentId || !signature) {
+      return res.status(400).json({ success: false, message: 'Payment confirmation is incomplete' })
+    }
+
+    const fields = razorpayEnv()
+    verifyPayment(fields, { orderId, paymentId, signature })
+
+    const tenant = await Tenant().findOne({ id: tenantId }).lean()
+    if (!tenant) return res.status(404).json({ success: false, message: 'Company not found' })
+    if (tenant.paymentRef && tenant.paymentRef !== orderId && tenant.billingStatus === 'paid') {
+      return res.json({ success: true, tenant: publicTenant(tenant), message: 'Already paid' })
+    }
+    if (tenant.paymentRef && tenant.paymentRef !== orderId) {
+      return res.status(400).json({ success: false, message: 'Order does not match this company' })
+    }
+
+    const updated = await Tenant()
+      .findOneAndUpdate(
+        { id: tenantId },
+        {
+          $set: {
+            status: 'Pending Approval',
+            billingStatus: 'paid',
+            paymentRef: paymentId,
+            notes: `Paid via Razorpay ${paymentId} (order ${orderId}). Awaiting platform owner activation.`,
+          },
+        },
+        { new: true },
+      )
+      .lean()
+
+    res.json({
+      success: true,
+      tenant: publicTenant(updated),
+      paymentId,
+      message: 'Payment received. Platform owner will activate your company.',
+    })
+  } catch (err) {
+    res.status(err.status || 400).json({ success: false, message: err.message })
+  }
+}
+
 export async function saasOverview(req, res) {
   try {
     if (!isPlatformAdmin(req.user)) {
@@ -536,7 +713,9 @@ export async function saasOverview(req, res) {
     const mrr = active.reduce((sum, t) => {
       const amt = Number(t.amount || 0)
       if (!amt) return sum
-      return sum + (t.billingCycle === 'yearly' ? amt / 12 : amt)
+      const monthly = t.billingCycle === 'yearly' ? amt / 12 : amt
+      const cur = String(t.currency || 'USD').toUpperCase()
+      return sum + (cur === 'INR' ? monthly / 83 : monthly)
     }, 0)
 
     res.json({
@@ -548,6 +727,7 @@ export async function saasOverview(req, res) {
         expiringSoon: expiring.length,
         suspendedOrExpired: expired.length,
         pendingDemos: demos.length,
+        estimatedMrrUsd: Math.round(mrr),
         estimatedMrrInr: Math.round(mrr),
         expiring,
         pendingBuyers: pending,

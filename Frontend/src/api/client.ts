@@ -195,6 +195,27 @@ export const api = {
         '/platform/subscribe',
         { method: 'POST', body: JSON.stringify(payload) },
       ),
+    checkout: (payload: Record<string, unknown>) =>
+      request<{
+        success: boolean
+        keyId: string
+        orderId: string
+        amount: number
+        currency: string
+        chargedAmount: number
+        chargedCurrency: string
+        displayAmount: number
+        displayCurrency: string
+        tenantId: string
+        plan: string
+        billingCycle: string
+        mode?: string
+      }>('/platform/checkout', { method: 'POST', body: JSON.stringify(payload) }),
+    verifyCheckout: (payload: Record<string, unknown>) =>
+      request<{ success: boolean; tenant: TenantDto; paymentId: string; message?: string }>(
+        '/platform/checkout/verify',
+        { method: 'POST', body: JSON.stringify(payload) },
+      ),
     requestDemo: (payload: Record<string, unknown>) =>
       request<{ success: boolean; data?: ResourceRow; message?: string }>(
         '/platform/demo-requests',
@@ -210,6 +231,7 @@ export const api = {
           expiringSoon: number
           suspendedOrExpired: number
           pendingDemos: number
+          estimatedMrrUsd?: number
           estimatedMrrInr: number
           expiring: TenantDto[]
           pendingBuyers: TenantDto[]

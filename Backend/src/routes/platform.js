@@ -7,8 +7,10 @@ import {
   listDemoRequests,
   listPublicPlans,
   listTenants,
+  createSubscriptionCheckout,
   requestSubscription,
   saasOverview,
+  verifySubscriptionPayment,
   suspendTenant,
   updateDemoRequest,
   updateTenantBilling,
@@ -20,6 +22,8 @@ const router = Router()
 /** Public SaaS marketing APIs */
 router.get('/plans', listPublicPlans)
 router.post('/subscribe', requestSubscription)
+router.post('/checkout', createSubscriptionCheckout)
+router.post('/checkout/verify', verifySubscriptionPayment)
 router.post('/demo-requests', createDemoRequest)
 
 router.use(authenticate)

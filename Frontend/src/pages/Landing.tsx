@@ -94,8 +94,23 @@ const BUSINESS_TYPES = [
   'Other',
 ]
 
-function formatInr(n: number) {
-  return `₹${Number(n || 0).toLocaleString('en-IN')}`
+function formatUsd(n: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(Number(n || 0))
+}
+
+function loadRazorpay() {
+  return new Promise<void>((resolve, reject) => {
+    if (document.querySelector('script[src*="checkout.razorpay.com"]')) return resolve()
+    const s = document.createElement('script')
+    s.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    s.onload = () => resolve()
+    s.onerror = () => reject(new Error('Could not load Razorpay checkout'))
+    document.body.appendChild(s)
+  })
 }
 
 export function Landing() {
@@ -106,6 +121,7 @@ export function Landing() {
   const [buyOpen, setBuyOpen] = useState<SaasPlanDto | null>(null)
   const [form, setForm] = useState({ companyName: '', contactName: '', email: '', phone: '' })
   const [submitted, setSubmitted] = useState(false)
+  const [paidRef, setPaidRef] = useState('')
   const [buyBusy, setBuyBusy] = useState(false)
   const [buyError, setBuyError] = useState('')
   const [navOpen, setNavOpen] = useState(false)
@@ -143,15 +159,60 @@ export function Landing() {
     setBuyBusy(true)
     setBuyError('')
     try {
-      await api.platform.subscribe({
+      const order = await api.platform.checkout({
         ...form,
         planId: buyOpen.id,
         billingCycle: cycle,
       })
-      setSubmitted(true)
+      await loadRazorpay()
+      const Razorpay = (
+        window as unknown as {
+          Razorpay: new (opts: object) => { open: () => void }
+        }
+      ).Razorpay
+      const priceLabel = formatUsd(order.displayAmount)
+      const chargeNote =
+        order.chargedCurrency === 'USD'
+          ? priceLabel
+          : `${priceLabel} (charged ${order.chargedCurrency} ${order.chargedAmount} on this Razorpay account)`
+      const rzp = new Razorpay({
+        key: order.keyId,
+        order_id: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'RugOS',
+        description: `${buyOpen.name} · ${cycle} · ${chargeNote}`,
+        prefill: {
+          name: form.contactName,
+          email: form.email,
+          contact: form.phone,
+        },
+        theme: { color: '#0e7490' },
+        handler: async (response: {
+          razorpay_order_id: string
+          razorpay_payment_id: string
+          razorpay_signature: string
+        }) => {
+          try {
+            const verified = await api.platform.verifyCheckout({
+              tenantId: order.tenantId,
+              ...response,
+            })
+            setPaidRef(verified.paymentId)
+            setSubmitted(true)
+          } catch (err) {
+            setBuyError(err instanceof ApiError ? err.message : 'Payment verification failed')
+          } finally {
+            setBuyBusy(false)
+          }
+        },
+        modal: {
+          ondismiss: () => setBuyBusy(false),
+        },
+      })
+      rzp.open()
     } catch (err) {
-      setBuyError(err instanceof ApiError ? err.message : 'Purchase request failed')
-    } finally {
+      setBuyError(err instanceof ApiError ? err.message : 'Could not start Razorpay checkout')
       setBuyBusy(false)
     }
   }
@@ -508,7 +569,7 @@ export function Landing() {
                 <p className="mt-1 text-sm text-[#5b6b7c]">{plan.description}</p>
                 <p className="mt-4">
                   <span className="landing-display text-3xl font-semibold tabular-nums text-[#0f2744]">
-                    {formatInr(price)}
+                    {formatUsd(price)}
                   </span>
                   <span className="text-sm text-[#5b6b7c]">
                     /{cycle === 'yearly' ? 'year' : 'month'}
@@ -527,6 +588,7 @@ export function Landing() {
                   onClick={() => {
                     setBuyOpen(plan)
                     setSubmitted(false)
+                    setPaidRef('')
                     setBuyError('')
                     setForm({ companyName: '', contactName: '', email: '', phone: '' })
                   }}
@@ -609,7 +671,7 @@ export function Landing() {
                 className="rounded-lg bg-[#0e7490] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                 onClick={() => void submitBuy()}
               >
-                {buyBusy ? 'Submitting…' : 'Request purchase'}
+                {buyBusy ? 'Opening Razorpay…' : 'Pay with Razorpay'}
               </button>
             </>
           )
@@ -617,8 +679,9 @@ export function Landing() {
       >
         {submitted ? (
           <div className="space-y-2 text-sm">
-            <p className="font-bold text-emerald-700">Purchase request received</p>
+            <p className="font-bold text-emerald-700">Payment received</p>
             <p className="text-[var(--text-muted)]">
+              Razorpay reference <strong className="font-mono">{paidRef || 'confirmed'}</strong>.
               Status: <strong>Pending Approval</strong>. Platform owner will activate your company
               and share login. Validity starts on activation ({cycle}).
             </p>
@@ -626,8 +689,11 @@ export function Landing() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             <p className="text-sm text-[var(--text-muted)] sm:col-span-2">
-              {buyOpen?.name} · {formatInr(cycle === 'yearly' ? buyOpen?.yearlyPrice || 0 : buyOpen?.monthlyPrice || 0)}{' '}
-              / {cycle === 'yearly' ? 'year' : 'month'}
+              {buyOpen?.name} · {formatUsd(cycle === 'yearly' ? buyOpen?.yearlyPrice || 0 : buyOpen?.monthlyPrice || 0)}{' '}
+              / {cycle === 'yearly' ? 'year' : 'month'} · Razorpay test mode
+            </p>
+            <p className="text-[11px] text-[var(--text-dim)] sm:col-span-2">
+              Test card 5267 3181 8797 5449 · any future expiry · any CVV. No real charge.
             </p>
             {(
               [

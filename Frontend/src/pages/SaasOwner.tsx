@@ -22,6 +22,7 @@ type Overview = {
   expiringSoon: number
   suspendedOrExpired: number
   pendingDemos: number
+  estimatedMrrUsd?: number
   estimatedMrrInr: number
   expiring: TenantDto[]
   pendingBuyers: TenantDto[]
@@ -29,8 +30,13 @@ type Overview = {
 
 type Tab = 'overview' | 'buyers' | 'subscriptions' | 'demos' | 'create'
 
-function formatInr(n: number) {
-  return `₹${Math.round(n || 0).toLocaleString('en-IN')}`
+function formatMoney(n: number, currency = 'USD') {
+  const code = String(currency || 'USD').toUpperCase() === 'INR' ? 'INR' : 'USD'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: code,
+    maximumFractionDigits: 0,
+  }).format(Number(n || 0))
 }
 
 function statusTone(s?: string): 'success' | 'warning' | 'danger' | 'purple' | 'slate' {
@@ -293,7 +299,7 @@ export function SaasOwner() {
               },
               {
                 label: 'Est. MRR',
-                value: formatInr(overview.estimatedMrrInr),
+                value: formatMoney(overview.estimatedMrrUsd ?? overview.estimatedMrrInr, 'USD'),
                 icon: CreditCard,
                 hint: `${overview.pendingDemos} open demos`,
               },
@@ -361,7 +367,7 @@ export function SaasOwner() {
                       <p className="font-semibold">{t.companyName || t.name}</p>
                       <p className="text-[11px] text-[var(--text-dim)]">
                         {t.daysLeft}d left · renews {String(t.renewsAt || '').slice(0, 10)} ·{' '}
-                        {formatInr(Number(t.amount || 0))}
+                        {formatMoney(Number(t.amount || 0), t.currency || 'USD')}
                       </p>
                     </div>
                     <Button size="sm" variant="secondary" onClick={() => void renew(t)}>
@@ -404,7 +410,7 @@ export function SaasOwner() {
                   </div>
                   <div>
                     <dt className="text-[var(--text-dim)]">Payment</dt>
-                    <dd className="font-semibold">{formatInr(Number(t.amount || 0))}</dd>
+                    <dd className="font-semibold">{formatMoney(Number(t.amount || 0), t.currency || 'USD')}</dd>
                   </div>
                   <div className="col-span-2">
                     <dt className="text-[var(--text-dim)]">Validity</dt>
@@ -484,7 +490,7 @@ export function SaasOwner() {
                         <span className="text-[11px] text-[var(--text-dim)]">{t.billingCycle}</span>
                       </td>
                       <td className="px-3 py-2.5 text-xs">
-                        {formatInr(Number(t.amount || 0))}
+                        {formatMoney(Number(t.amount || 0), t.currency || 'USD')}
                         <br />
                         <span className="font-mono text-[var(--text-dim)]">{t.paymentRef || '—'}</span>
                       </td>
@@ -562,7 +568,7 @@ export function SaasOwner() {
                   <Badge tone={statusTone(t.billingStatus)}>{t.billingStatus}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {t.planLabel || t.plan} · {t.billingCycle} · {formatInr(Number(t.amount || 0))}
+                  {t.planLabel || t.plan} · {t.billingCycle} · {formatMoney(Number(t.amount || 0), t.currency || 'USD')}
                 </p>
                 <p className="mt-2 font-mono text-[11px] text-[var(--text-dim)]">
                   {t.paymentRef || '—'}
@@ -594,7 +600,7 @@ export function SaasOwner() {
                       <td className="px-3 py-2">
                         {t.planLabel || t.plan} · {t.billingCycle}
                       </td>
-                      <td className="px-3 py-2 font-mono">{formatInr(Number(t.amount || 0))}</td>
+                      <td className="px-3 py-2 font-mono">{formatMoney(Number(t.amount || 0), t.currency || 'USD')}</td>
                       <td className="px-3 py-2 font-mono text-xs">{t.paymentRef || '—'}</td>
                       <td className="px-3 py-2 text-xs">
                         {t.renewsAt ? String(t.renewsAt).slice(0, 10) : '—'}

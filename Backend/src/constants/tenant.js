@@ -13,7 +13,7 @@ export const DEFAULT_TENANT = {
   billingStatus: 'active',
   billingCycle: 'yearly',
   amount: PLANS.enterprise.yearlyPrice,
-  currency: 'INR',
+  currency: 'USD',
   paymentRef: 'PAY-PLATFORM-OWNER',
   modules: [...PLANS.enterprise.modules],
   seats: PLANS.enterprise.seats,

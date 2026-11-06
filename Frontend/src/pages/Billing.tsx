@@ -183,7 +183,9 @@ export function Billing() {
               Renews: {tenant?.renewsAt ? String(tenant.renewsAt).slice(0, 10) : '—'}
               {tenant?.daysLeft != null ? ` · ${tenant.daysLeft}d left` : ''}
               {tenant?.paymentRef ? ` · ${tenant.paymentRef}` : ''}
-              {tenant?.amount != null ? ` · ₹${Number(tenant.amount).toLocaleString('en-IN')}` : ''}
+              {tenant?.amount != null
+                ? ` · ${new Intl.NumberFormat('en-US', { style: 'currency', currency: tenant.currency || 'USD', maximumFractionDigits: 0 }).format(Number(tenant.amount))}`
+                : ''}
             </div>
           </div>
         </div>
@@ -233,11 +235,20 @@ export function Billing() {
               </div>
               <p className="mt-1 text-[12px] text-[var(--text-muted)]">{p.description}</p>
               <p className="mt-2 font-mono text-sm font-bold text-[var(--text-main)]">
-                ₹{Number(p.monthlyPrice || 0).toLocaleString('en-IN')}
+                {new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: p.currency || 'USD',
+                  maximumFractionDigits: 0,
+                }).format(Number(p.monthlyPrice || 0))}
                 <span className="text-[11px] font-medium text-[var(--text-dim)]"> /mo</span>
               </p>
               <p className="font-mono text-[11px] text-[var(--text-dim)]">
-                ₹{Number(p.yearlyPrice || 0).toLocaleString('en-IN')} /yr · {p.seats ?? '—'} seats
+                {new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: p.currency || 'USD',
+                  maximumFractionDigits: 0,
+                }).format(Number(p.yearlyPrice || 0))}{' '}
+                /yr · {p.seats ?? '—'} seats
               </p>
               {on ? (
                 <span className="mt-2 inline-block text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-300">

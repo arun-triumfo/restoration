@@ -27,6 +27,15 @@ export async function createCheckout(fields, { amount, currency, receipt, notes 
   }
 }
 
+export function verifyPayment(fields, { orderId, paymentId, signature }) {
+  const expected = crypto
+    .createHmac('sha256', fields.keySecret)
+    .update(`${orderId}|${paymentId}`)
+    .digest('hex')
+  if (expected !== signature) throw new Error('Payment signature mismatch')
+  return true
+}
+
 export function verifyWebhook(fields, rawBody, signature) {
   if (!fields.webhookSecret) throw new Error('Razorpay webhook secret not saved')
   const expected = crypto.createHmac('sha256', fields.webhookSecret).update(rawBody).digest('hex')
