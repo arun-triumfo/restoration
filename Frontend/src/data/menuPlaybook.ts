@@ -75,7 +75,7 @@ export const MENU_PLAYBOOK: MenuPlaybookItem[] = [
       'Orders routing reads India / US available qty from this catalog.',
     ],
     crud: 'Add / Edit / Delete + bulk CSV + photos',
-  }
+  },
   {
     step: 5,
     section: '2 · Stock',
