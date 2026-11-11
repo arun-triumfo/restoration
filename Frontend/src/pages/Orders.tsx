@@ -1,5 +1,6 @@
 import {
   Camera,
+  Download,
   Eye,
   ExternalLink,
   Lock,
@@ -12,6 +13,7 @@ import {
   SwitchCamera,
   Trash2,
   Truck,
+  Upload,
   Zap,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -65,6 +67,39 @@ const FORM_FIELDS = [
   'shippingAddress',
   'awb',
 ] as const
+
+const ORDER_CSV_HEADERS = [...FORM_FIELDS] as const
+
+const ORDER_CSV_SAMPLE: Record<(typeof ORDER_CSV_HEADERS)[number], string>[] = [
+  {
+    orderId: 'ORD-BULK-001',
+    channel: 'Amazon US',
+    marketplaceOrderId: 'AMZ-111-222',
+    orderDate: new Date().toISOString().slice(0, 10),
+    buyerName: 'Jane Buyer',
+    sku: 'SKU-DEMO-US-STOCK',
+    qty: '1',
+    totalOrderUSD: '420',
+    status: 'Pending Allocation',
+    fulfillmentWh: 'US Warehouse',
+    shippingAddress: '12 Main St, Edison NJ 08817 USA',
+    awb: '',
+  },
+  {
+    orderId: 'ORD-BULK-002',
+    channel: 'Shopify DTC',
+    marketplaceOrderId: 'SHP-9001',
+    orderDate: new Date().toISOString().slice(0, 10),
+    buyerName: 'Alex Customer',
+    sku: 'SKU-DEMO-INDIA-STOCK',
+    qty: '1',
+    totalOrderUSD: '680',
+    status: 'Pending Allocation',
+    fulfillmentWh: 'India Warehouse',
+    shippingAddress: '88 Oak Ave, Austin TX 78701 USA',
+    awb: '',
+  },
+]
 
 type SkuInfo = {
   title: string
@@ -281,6 +316,111 @@ export function Orders() {
   const [productNotes, setProductNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const csvInputRef = useRef<HTMLInputElement>(null)
+
+  const parseCsvLine = (line: string) => {
+    const out: string[] = []
+    let cur = ''
+    let inQ = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') {
+        inQ = !inQ
+        continue
+      }
+      if (ch === ',' && !inQ) {
+        out.push(cur.trim())
+        cur = ''
+        continue
+      }
+      cur += ch
+    }
+    out.push(cur.trim())
+    return out
+  }
+
+  const downloadOrderTemplate = () => {
+    const escape = (v: string) => {
+      if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`
+      return v
+    }
+    const header = ORDER_CSV_HEADERS.join(',')
+    const rows = ORDER_CSV_SAMPLE.map((row) =>
+      ORDER_CSV_HEADERS.map((h) => escape(String(row[h] ?? ''))).join(','),
+    )
+    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'rugos-orders-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    pushToast('Sample order sheet downloaded', 'success')
+  }
+
+  const importOrdersCsv = async (file: File) => {
+    try {
+      setImporting(true)
+      const text = await file.text()
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+      if (lines.length < 2) throw new Error('CSV needs a header row + at least 1 data row')
+      const headers = parseCsvLine(lines[0]).map((h) => h.replace(/^\uFEFF/, ''))
+      let ok = 0
+      let fail = 0
+      for (const line of lines.slice(1)) {
+        const cols = parseCsvLine(line)
+        const row: Record<string, string> = {}
+        headers.forEach((h, i) => {
+          row[h] = cols[i] ?? ''
+        })
+        const orderId = String(row.orderId || '').trim()
+        if (!orderId) {
+          fail += 1
+          continue
+        }
+        const payload: ResourceRow = {
+          orderId,
+          channel: row.channel || 'Direct Offline',
+          marketplaceOrderId: row.marketplaceOrderId || '',
+          orderDate: row.orderDate || new Date().toISOString().slice(0, 10),
+          buyerName: row.buyerName || '',
+          sku: row.sku || '',
+          qty: Number(row.qty || 1) || 1,
+          totalOrderUSD: Number(row.totalOrderUSD || 0) || 0,
+          status: row.status || 'Pending Allocation',
+          fulfillmentWh: row.fulfillmentWh || '',
+          shippingAddress: row.shippingAddress || '',
+          awb: row.awb || '',
+          stockAllocation: 'Pending',
+          mtoNeeded: false,
+          queueOwner: 'india_wh',
+        }
+        try {
+          const existing = orders.find((o) => String(o.orderId) === orderId)
+          if (existing) {
+            await update('orders', orderId, { ...existing, ...payload })
+          } else {
+            await create('orders', payload)
+          }
+          ok += 1
+        } catch {
+          fail += 1
+        }
+      }
+      pushToast(
+        `Order bulk import: ${ok} saved${fail ? `, ${fail} failed` : ''}`,
+        ok ? 'success' : 'danger',
+      )
+    } catch (err) {
+      pushToast(err instanceof Error ? err.message : 'CSV import failed', 'danger')
+    } finally {
+      setImporting(false)
+    }
+  }
   const shipVideoRef = useRef<HTMLVideoElement>(null)
   const shipStreamRef = useRef<MediaStream | null>(null)
 
@@ -522,6 +662,33 @@ export function Orders() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {(role === 'india_wh' || role === 'super_admin' || role === 'finance') && (
+            <>
+              <Button variant="secondary" size="sm" onClick={downloadOrderTemplate}>
+                <Download className="h-3.5 w-3.5" /> Download sample template
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={importing}
+                onClick={() => csvInputRef.current?.click()}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                {importing ? 'Importing…' : 'Bulk CSV upload'}
+              </Button>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) void importOrdersCsv(file)
+                }}
+              />
+            </>
+          )}
           {(role === 'india_wh' || role === 'super_admin') && (
             <Button variant="secondary" size="sm" onClick={bulkAllocate} disabled={!!busyAction}>
               <RefreshCw className="h-3.5 w-3.5" />

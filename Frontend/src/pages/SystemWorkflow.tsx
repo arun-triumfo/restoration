@@ -73,9 +73,10 @@ export function SystemWorkflow() {
             Platform status for Restoration
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)] sm:text-[15px]">
-            Start on the <strong className="text-[var(--text-main)]">How to use</strong> tab — every
-            menu, in sidebar order, with purpose and clicks. Lists come from Mongo. Keys for live
-            Shopify / payments / couriers are under What is left.
+            RugOS runs India→USA rug commerce for one subscribed company: take the order, find stock
+            (US / India / make), pack, ship, then returns &amp; finance. Start on{' '}
+            <strong className="text-[var(--text-main)]">How to use</strong>. Live Shopify / Razorpay /
+            courier keys still needed are only under <strong className="text-[var(--text-main)]">What is left</strong>.
           </p>
 
           <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -132,9 +133,9 @@ export function SystemWorkflow() {
           <header className="px-1">
             <h2 className="text-lg font-bold text-[var(--text-main)]">What is left — and why</h2>
             <p className="text-sm text-[var(--text-muted)]">
-              Nothing below is blocked on missing product screens. Live Amazon / Shopify / payments /
-              real courier labels need Restoration company API accounts. Until then, sandbox demos
-              work for review.
+              Only real blockers. Orders, Inventory, MTO, Packing, Shipping sandbox, SaaS login, and
+              USD pricing already work. Items below need Restoration API credentials before live
+              sync / live labels / live checkout.
             </p>
           </header>
 
@@ -332,10 +333,16 @@ export function SystemWorkflow() {
       {tab === 'journey' ? (
         <section className="space-y-3">
           <header className="px-1">
-            <h2 className="text-lg font-bold text-[var(--text-main)]">End-to-end business journey</h2>
+            <h2 className="text-lg font-bold text-[var(--text-main)]">Business journey (simple story)</h2>
             <p className="text-sm text-[var(--text-muted)]">
-              Read top to bottom like a story. Open any step to jump into that menu.
+              Follow the rug from customer purchase → warehouse decision → mill (if needed) → pack
+              &amp; ship → returns / money. Open any step to jump into that screen.
             </p>
+            <div className="mt-3 rounded-xl border border-teal-500/30 bg-teal-500/5 px-3 py-2.5 text-[13px] text-[var(--text-main)]">
+              <strong>Module purpose:</strong> RugOS is the operations system for a company that
+              bought the SaaS plan. It is <em>not</em> the Platform Owner console (/saas). Company
+              Admin + India WH + US WH + Finance work here every day.
+            </div>
           </header>
 
           <ol className="space-y-3">
@@ -510,9 +517,25 @@ export function SystemWorkflow() {
           <header className="px-1">
             <h2 className="text-lg font-bold text-[var(--text-main)]">How to use every menu</h2>
             <p className="text-sm text-[var(--text-muted)]">
-              Same order as the left sidebar. Purpose, who uses it, and the exact clicks. All lists
-              load from Mongo — Add / Edit / Delete on tables, not dummy screens.
+              Same order as the left sidebar. For each menu: <strong>what it is for</strong>, who
+              uses it, and the exact clicks. Data is live Mongo — Add / Edit / Delete are real.
             </p>
+            <div className="mt-3 space-y-2 rounded-xl border border-indigo-500/25 bg-indigo-500/5 px-3 py-3 text-[13px] leading-relaxed text-[var(--text-main)]">
+              <p>
+                <strong>What is RugOS?</strong> One company workspace for India manufacturing + US
+                fulfillment. Orders come in → stock is checked → rugs are packed and shipped →
+                returns and finance close the loop.
+              </p>
+              <p>
+                <strong>Who logs in?</strong> Company Admin (bought the plan), India Warehouse,
+                US Warehouse, Finance. Platform Owner (<code className="text-[11px]">admin@…</code>)
+                uses a different login for the SaaS seller console — not this ops app.
+              </p>
+              <p>
+                <strong>Suggested order:</strong> Orders → Inventory → MTO (if make) → Packing →
+                Shipping → Returns / Finance.
+              </p>
+            </div>
           </header>
           {PLAYBOOK_SECTIONS.map((section) => (
             <div

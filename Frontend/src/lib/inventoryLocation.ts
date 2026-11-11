@@ -108,11 +108,16 @@ export function locationsFromCsv(row: Record<string, string>) {
 }
 
 export function mediaUrl(raw: unknown, apiBase: string) {
-  const s = str(raw)
-  if (!s) return ''
+  const s = str(raw).trim()
+  if (!s || s === 'null' || s === 'undefined' || s === '-') return ''
   if (/^(https?:|data:|blob:)/i.test(s)) return s
   const origin = apiBase.replace(/\/api\/?$/, '')
   return `${origin}${s.startsWith('/') ? s : `/${s}`}`
+}
+
+/** Hide broken /uploads paths (Render disk resets wipe files after redeploy). */
+export function isUsablePhotoUrl(raw: unknown, apiBase: string) {
+  return Boolean(mediaUrl(raw, apiBase))
 }
 
 export const CSV_LOCATION_HEADERS = [

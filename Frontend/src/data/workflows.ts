@@ -46,22 +46,24 @@ export const JOURNEY_STEPS: WorkflowStep[] = [
   {
     id: 'j1',
     step: 1,
-    title: 'Login as India WH',
-    plain: 'india@restoration.com / RugOS@2026 — Orders open pehle.',
+    title: '1 · Customer buys a rug',
+    plain:
+      'Order enters RugOS from Amazon / Shopify / Walmart / offline sheet — or you create it on Orders / bulk CSV.',
     detail:
-      'Search ORD-DEMO for seeded client tests. A=US stock, B=India ship, C=Make, D=Offline+Finance.',
+      'Purpose: one queue for every sales channel. Company Admin or India WH opens Orders. Search by ORD-…, buyer, or SKU. Status starts as Pending Allocation until stock is checked.',
     menuPath: '/orders',
     menuLabel: 'Orders',
-    department: 'India Warehouse Manager',
+    department: 'Company Admin / India WH',
     status: 'live',
   },
   {
     id: 'j2',
     step: 2,
-    title: 'A · US available',
-    plain: 'ORD-DEMO-A-US → Zap barcode → order US bucket mein.',
+    title: '2 · Path A — rug already in US warehouse',
+    plain:
+      'If US stock exists → India sends the courier label to US → order leaves India list → US packs and ships to the customer.',
     detail:
-      'Inventory SKU-DEMO-US-STOCK has usaAvailable. After barcode, logout → usa@restoration.com → Packing → customer dispatch.',
+      'Try ORD-DEMO-A-US (or any order with US qty). India presses “Send courier label to US”. Then login usa@restoration.com → Packing Station → scan / pack → dispatch to customer address.',
     menuPath: '/orders',
     menuLabel: 'Orders → Packing (US login)',
     department: 'India then US WH',
@@ -70,57 +72,66 @@ export const JOURNEY_STEPS: WorkflowStep[] = [
   {
     id: 'j3',
     step: 3,
-    title: 'B · US empty, India has stock',
-    plain: 'ORD-DEMO-B-INDIA → Prep ship → courier label → pack → dispatch direct to customer.',
+    title: '3 · Path B — rug only in India',
+    plain:
+      'India enters weight → buys live/sandbox courier label → packs → dispatches straight to the US customer (not via US warehouse).',
     detail:
-      'Then usa@restoration.com → Receive (package icon) → Packing → customer. Or Stock Transfers + Shipping Desk.',
-    menuPath: '/orders',
-    menuLabel: 'Orders → Shipping',
-    department: 'India then US WH',
+      'Try ORD-DEMO-B-INDIA. Use “Prep ship to customer”, print label, pack with photos, then Dispatch. Shipping Desk can also rate-shop carriers.',
+    menuPath: '/shipping',
+    menuLabel: 'Orders → Shipping Desk',
+    department: 'India WH',
     status: 'live',
   },
   {
     id: 'j4',
     step: 4,
-    title: 'C · No stock anywhere (make)',
-    plain: 'ORD-DEMO-C-MAKE = In Process + ETA → Package = Production Complete.',
-    detail: 'Then same as B: direct to customer. Optional: open MTO Jobs / Buy Sheet for mill work.',
+    title: '4 · Path C — no stock (make to order)',
+    plain:
+      'Order goes to mill: Queued → Weaving → QC → Ready. When Ready, India marks the order and ships like Path B.',
+    detail:
+      'Open MTO Jobs (or ORD-DEMO-C-MAKE). Move stages in order. After Ready, return to Orders → Mark ready → Prep ship → label → pack → dispatch.',
     menuPath: '/mto',
-    menuLabel: 'Orders → MTO',
-    department: 'India Warehouse Manager',
+    menuLabel: 'MTO Jobs',
+    department: 'India WH / Mill',
     status: 'live',
   },
   {
     id: 'j5',
     step: 5,
-    title: 'D · Offline + Finance tag',
-    plain: 'ORD-DEMO-D-OFFLINE shows Finance badge — India→US same as B.',
-    detail: 'finance@restoration.com → Orders (Finance badge) → Profitability / Courier Audit / Export Docs.',
-    menuPath: '/profitability',
-    menuLabel: 'Orders → Finance',
-    department: 'India + Finance',
+    title: '5 · Stock truth (bins & photos)',
+    plain:
+      'Inventory holds SKU qty + zone/aisle/rack/bin + warehouse photos so pickers find the rug fast.',
+    detail:
+      'Before dispatch, open Inventory. Confirm India / US qty and pick location. Re-upload warehouse floor photos if they look broken (old disk links after server restart).',
+    menuPath: '/inventory',
+    menuLabel: 'Inventory',
+    department: 'India / US WH',
     status: 'live',
   },
   {
     id: 'j6',
     step: 6,
-    title: 'Returns (US login)',
-    plain: 'Customer return → Returns menu under US Warehouse Manager.',
-    detail: 'usa@restoration.com → Returns → add RMA → grade / restock.',
+    title: '6 · Returns & money',
+    plain:
+      'Customer return → Returns menu. Finance checks receivables, courier audit, profitability.',
+    detail:
+      'usa@ or india@ opens Returns for RMA. finance@restoration.com reviews Profitability / Courier Audit / Export Docs. Offline/B2B orders may show a Finance badge on Orders.',
     menuPath: '/returns',
-    menuLabel: 'Returns',
-    department: 'US Warehouse Manager',
+    menuLabel: 'Returns → Finance menus',
+    department: 'US WH + Finance',
     status: 'live',
   },
   {
     id: 'j7',
     step: 7,
-    title: 'Masters & integrations (optional)',
-    plain: 'Company, Users, Warehouses, Integrations — sidebar bottom.',
-    detail: 'Super Admin only for keys. Daily ops never start from Masters.',
-    menuPath: '/integrations',
-    menuLabel: 'Masters → Integrations',
-    department: 'Super Admin',
+    title: '7 · SaaS owner vs company (who logs in where)',
+    plain:
+      'Platform owner (admin@) manages buyers on /saas. Company Admin (company-admin@) runs day-to-day ops — never the same dashboard.',
+    detail:
+      'Owner login → activate subscriptions, payments, expiry. Company login → Orders, Inventory, Shipping. Do not mix the two while testing.',
+    menuPath: '/login',
+    menuLabel: 'Login hub',
+    department: 'Platform owner + Company Admin',
     status: 'live',
   },
 ]
@@ -462,95 +473,60 @@ export type OwnerRequirement = {
 /** Alias kept for older imports */
 export type ClientRequirement = OwnerRequirement
 
+/** Only items still blocking live go-live — sandbox screens are already working. */
 export const OWNER_REQUIRED: OwnerRequirement[] = [
   {
-    title: 'Payment gateway (Stripe or Razorpay)',
-    whyLeft: 'Waiting on Restoration billing account keys to turn on live checkout.',
-    area: 'Billing',
-    provide: [
-      'Stripe Secret + Publishable keys OR Razorpay Key ID + Secret',
-      'Webhook signing secret',
-      'Preferred currency (USD / INR) and plan prices',
-    ],
-    readyNow:
-      'Admin pastes Key ID + Secret on Integrations → Razorpay (Live). Test pings Razorpay; Pay on Billing opens checkout. Webhook URL is /api/webhooks/razorpay.',
-    received:
-      'Razorpay dashboard login shared. Next: generate Key ID + Key Secret from that dashboard and paste them on Integrations.',
-  },
-  {
-    title: 'Shopify Admin API',
-    whyLeft: 'Waiting on Restoration Shopify store domain and Admin API token.',
-    area: 'Marketplace',
-    provide: [
-      'Shopify store domain (xxx.myshopify.com)',
-      'Admin API access token (or OAuth app ID / secret)',
-      'Which locations map to USA warehouse / FBA',
-    ],
-    readyNow:
-      'Admin pastes shop domain + Admin API token on Integrations → Shopify (Live). Test pings the shop; Sync now pulls live orders with SKU images.',
-    received:
-      'Store website (odetterugs.com) and Shopify login shared. Next: create a custom app and paste the shpat_ token plus xxx.myshopify.com on Integrations.',
-  },
-  {
-    title: 'Aramex / Shiprocket / ShipGlobal.in (priority couriers)',
+    title: 'Razorpay live / test API keys',
     whyLeft:
-      'Set up first, ahead of FedEx / DHL. Waiting on API-enabled user IDs for each courier account.',
+      'Checkout code is ready (USD pricing + Pay with Razorpay). Real Key ID + Key Secret are still missing in Backend env / Integrations.',
+    area: 'Billing',
+    priority: true,
+    provide: [
+      'Razorpay Test Key ID (rzp_test_…) + Key Secret',
+      'Later: Live Key ID + Secret for production charges',
+      'Optional webhook signing secret for /api/webhooks/razorpay',
+    ],
+    readyNow:
+      'Paste keys in Backend RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET (or Integrations → Razorpay). Landing Subscribe then opens real Razorpay checkout.',
+    received: 'Razorpay dashboard access was shared earlier — keys still need to be generated and pasted.',
+  },
+  {
+    title: 'Shopify Admin API token',
+    whyLeft: 'Live Shopify orders + product images cannot sync until the custom-app token is pasted.',
+    area: 'Marketplace',
+    priority: true,
+    provide: [
+      'Shop domain (xxx.myshopify.com)',
+      'Admin API access token (shpat_…)',
+      'Which Shopify location = US warehouse',
+    ],
+    readyNow:
+      'Integrations → Shopify (Live) → Test → Sync now pulls orders with SKU images into Orders / Inventory.',
+    received: 'Store site / login shared. Still need custom app token + myshopify domain.',
+  },
+  {
+    title: 'Priority courier APIs (Shiprocket / Aramex / ShipGlobal)',
+    whyLeft: 'Sandbox labels work; live AWBs need courier API user + password on Integrations.',
     area: 'Shipping',
     priority: true,
     provide: [
-      'Shiprocket: API user email + password (Settings → API → Configure)',
-      'Aramex: username, password, account number, account PIN, account entity + country',
-      'ShipGlobal.in: integration user ID + API key / password',
+      'Shiprocket API email + password',
+      'and/or Aramex account credentials',
+      'and/or ShipGlobal.in API user + key',
     ],
     readyNow:
-      'Admin pastes courier user ID + password on Integrations (Live). Test logs into the courier. Shipping Desk then uses live rates / labels for that carrier.',
-    received: 'User IDs and passwords are being shared — paste them on Integrations when ready.',
+      'Paste on Integrations (Live). Shipping Desk then uses that carrier for live rates and label PDF.',
   },
   {
-    title: 'Amazon Selling Partner API (SP-API)',
-    whyLeft: 'Waiting on Restoration Amazon seller / SP-API app credentials for live orders.',
+    title: 'Amazon SP-API (seller account)',
+    whyLeft: 'Amazon orders stay manual / CSV until SP-API app credentials are provided.',
     area: 'Marketplace',
     provide: [
       'LWA App ID + App Secret',
-      'Refresh token / seller account access',
-      'Marketplace IDs (e.g. ATVPDKIKX0DER)',
-      'AWS IAM role ARN if required by the SP-API app',
+      'Refresh token',
+      'Marketplace ID (e.g. ATVPDKIKX0DER)',
     ],
-    readyNow:
-      'Admin pastes LWA App ID, secret and refresh token on Integrations → Amazon (Live). Test exchanges the token; Sync now pulls SP-API orders.',
-  },
-  {
-    title: 'Etsy / Walmart / other channels (optional)',
-    whyLeft: 'Optional — only if Restoration wants those channels live.',
-    area: 'Marketplace',
-    provide: ['API keys / OAuth apps per channel', 'SKU mapping rules'],
-    readyNow:
-      'Admin pastes shop id + API key + OAuth token on Integrations → Etsy (Live). Test and Sync use the Etsy Open API.',
-  },
-  {
-    title: 'FedEx / DHL (live courier)',
-    whyLeft:
-      'Waiting on Restoration carrier account credentials for real AWBs. Scheduled after the priority couriers above.',
-    area: 'Shipping',
-    provide: [
-      'FedEx account + API key / secret (or DHL Express credentials)',
-      'Meter number / account ZIP',
-      'Optional: cloud storage bucket for production label files',
-    ],
-    readyNow:
-      'Admin pastes FedEx / DHL API keys on Integrations (Live). Shipping Desk switches that carrier to live rates and labels automatically.',
-  },
-  {
-    title: 'Production URLs & backup owner',
-    whyLeft: 'Waiting on final Restoration go-live URLs and who owns Atlas restore drills.',
-    area: 'Ops',
-    provide: [
-      'Final frontend URL (Render / custom domain)',
-      'Final backend URL',
-      'Ops contact for JWT secret rotation',
-      'Confirm one Atlas backup restore drill',
-    ],
-    readyNow: 'Security hardening and ops runbook are already in place.',
+    readyNow: 'Integrations → Amazon (Live) → Test → Sync pulls SP-API orders into the Order Pipeline.',
   },
 ]
 
@@ -847,8 +823,14 @@ export const DEMO_PASSWORD = 'RugOS@2026'
 export const DEMO_LOGINS = [
   {
     email: 'admin@restoration.com',
-    name: 'Restoration Admin',
-    role: 'Super Admin',
+    name: 'Platform Owner',
+    role: 'Platform Owner (SaaS /saas)',
+    roleCode: 'super_admin',
+  },
+  {
+    email: 'company-admin@restoration.com',
+    name: 'Company Admin',
+    role: 'Company Admin (buyer · ops app)',
     roleCode: 'super_admin',
   },
   {

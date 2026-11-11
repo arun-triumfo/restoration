@@ -25,10 +25,61 @@ import {
   locOf,
   locationsFromCsv,
   locationsFromForm,
+  isUsablePhotoUrl,
   mediaUrl,
   pickPath,
   type WhKey,
 } from '../lib/inventoryLocation'
+
+function SafePhoto({
+  src,
+  className,
+  alt = '',
+  onBroken,
+}: {
+  src: string
+  className?: string
+  alt?: string
+  onBroken?: () => void
+}) {
+  const [broken, setBroken] = useState(false)
+  if (!src || broken) return null
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => {
+        setBroken(true)
+        onBroken?.()
+      }}
+    />
+  )
+}
+
+function WarehousePhotoStrip({ urls }: { urls: string[] }) {
+  const [failed, setFailed] = useState(0)
+  if (!urls.length || failed >= urls.length) {
+    return (
+      <p className="mt-3 text-xs text-[var(--text-dim)]">
+        No live photos yet — use <strong>Add photo</strong>. Old server file links break after
+        restart; re-upload once and the photo is kept in the database.
+      </p>
+    )
+  }
+  return (
+    <div className="mt-3 flex gap-2 overflow-x-auto">
+      {urls.map((src) => (
+        <SafePhoto
+          key={src.slice(0, 64)}
+          src={src}
+          className="h-24 w-36 shrink-0 rounded-lg border border-[var(--border-main)] object-cover"
+          onBroken={() => setFailed((n) => n + 1)}
+        />
+      ))}
+    </div>
+  )
+}
 
 type StockTab = 'all' | 'pickup' | 'lowStock' | 'india' | 'usa' | 'inTransit' | 'heritage' | 'boho'
 
@@ -452,10 +503,19 @@ export function Inventory() {
     }
   }
 
+  /** Prefer data URL so photos survive Render redeploys (disk /uploads is wiped). */
   const uploadPhoto = async (folder: 'inventory-locations' | 'warehouse-photos', key: string, file: File) => {
     const dataUrl = await fileToDataUrl(file)
-    const res = await api.uploads.photo({ photoDataUrl: dataUrl, folder, key })
-    return res.url
+    try {
+      if (file.size <= 900_000) {
+        const res = await api.uploads.photo({ photoDataUrl: dataUrl, folder, key })
+        // Keep data URL as source of truth; server path is bonus for local/dev
+        return dataUrl || mediaUrl(res.url, api.base)
+      }
+    } catch {
+      /* fall through — still save data URL into Mongo */
+    }
+    return dataUrl
   }
 
   const onLocPhoto = async (wh: WhKey, file: File | undefined) => {
@@ -478,14 +538,12 @@ export function Inventory() {
     try {
       setPhotoBusy(id)
       const url = await uploadPhoto('warehouse-photos', id || 'wh', file)
-      const photos = [wh.imageUrl, wh.photo2Url, wh.photo3Url].map((p) => String(p || '')).filter(Boolean)
       const next: ResourceRow = { ...wh }
-      if (!next.imageUrl) next.imageUrl = url
-      else if (!next.photo2Url) next.photo2Url = url
+      if (!isUsablePhotoUrl(next.imageUrl, api.base)) next.imageUrl = url
+      else if (!isUsablePhotoUrl(next.photo2Url, api.base)) next.photo2Url = url
       else next.photo3Url = url
-      if (photos.length >= 3) next.photo3Url = url
       await update('warehouses', id, next)
-      pushToast('Warehouse photo saved', 'success')
+      pushToast('Warehouse photo saved (kept in database)', 'success')
     } catch (err) {
       pushToast(err instanceof ApiError ? err.message : 'Warehouse photo failed', 'danger')
     } finally {
@@ -550,7 +608,7 @@ export function Inventory() {
         ) : (
           warehouses.map((wh) => {
             const pics = [wh.imageUrl, wh.photo2Url, wh.photo3Url, wh.floorPlanUrl]
-              .map((p) => String(p || ''))
+              .map((p) => mediaUrl(p, api.base))
               .filter(Boolean)
             const id = String(wh.id || '')
             return (
@@ -585,22 +643,7 @@ export function Inventory() {
                     />
                   </label>
                 </div>
-                {pics.length ? (
-                  <div className="mt-3 flex gap-2 overflow-x-auto">
-                    {pics.map((src) => (
-                      <img
-                        key={src}
-                        src={mediaUrl(src, api.base)}
-                        alt=""
-                        className="h-24 w-36 shrink-0 rounded-lg border border-[var(--border-main)] object-cover"
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-xs text-[var(--text-dim)]">
-                    No live photos yet — add a floor / rack photo so pickers know the layout.
-                  </p>
-                )}
+                <WarehousePhotoStrip urls={pics} />
               </article>
             )
           })
