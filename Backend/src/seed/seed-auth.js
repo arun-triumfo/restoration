@@ -19,27 +19,39 @@ const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'RugOS@2026'
 const DEMO_USERS = [
   {
     email: 'admin@restoration.com',
-    name: 'Restoration Admin',
-    role: 'Super Admin',
+    name: 'Platform Owner',
+    role: 'Platform Owner',
     roleCode: 'super_admin',
+    isPlatformOwner: true,
+  },
+  {
+    /** Company that bought SaaS — ops app admin, NOT /saas */
+    email: 'company-admin@restoration.com',
+    name: 'Company Admin',
+    role: 'Company Admin',
+    roleCode: 'super_admin',
+    isPlatformOwner: false,
   },
   {
     email: 'india@restoration.com',
     name: 'India Warehouse Manager',
     role: 'India Warehouse Manager',
     roleCode: 'india_wh',
+    isPlatformOwner: false,
   },
   {
     email: 'usa@restoration.com',
     name: 'US Warehouse Manager',
     role: 'US Warehouse Manager',
     roleCode: 'usa_wh',
+    isPlatformOwner: false,
   },
   {
     email: 'finance@restoration.com',
     name: 'Finance Manager',
     role: 'Finance Manager',
     roleCode: 'finance',
+    isPlatformOwner: false,
   },
 ]
 
@@ -105,12 +117,18 @@ async function main() {
           passwordHash,
           whAccess: 'As per role',
           perm: 'Role-based',
-          isPlatformOwner: roleCode === 'super_admin',
+          isPlatformOwner: Boolean(u.isPlatformOwner),
         },
       },
       { upsert: true, new: true },
     )
-    console.log('User upserted:', u.email, '→', roleCode)
+    console.log(
+      'User upserted:',
+      u.email,
+      '→',
+      roleCode,
+      u.isPlatformOwner ? '(platform owner → /saas)' : '(company → /dashboard)',
+    )
   }
 
   for (const email of LEGACY_DEACTIVATE) {
@@ -129,18 +147,19 @@ async function main() {
       $set: {
         email: 'admin-b@restoration.com',
         name: 'Tenant B Admin',
-        role: 'Super Admin',
+        role: 'Company Admin',
         roleCode: 'super_admin',
         status: 'Active',
         tenantId: DEMO_TENANT_B.id,
         passwordHash,
         whAccess: 'As per role',
         perm: 'Role-based',
+        isPlatformOwner: false,
       },
     },
     { upsert: true, new: true },
   )
-  console.log('User upserted: admin-b@restoration.com → super_admin (Tenant B)')
+  console.log('User upserted: admin-b@restoration.com → company admin (Tenant B, not /saas)')
 
   // Deactivate old tenant-b email if present
   await User.updateMany(

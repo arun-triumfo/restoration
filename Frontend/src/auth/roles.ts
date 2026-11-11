@@ -115,8 +115,13 @@ export const OWNER_DEMO = {
   roleCode: 'super_admin' as RoleCode,
 }
 
-/** Company (tenant) demos — use /login/company only */
+/** Company (buyer) demos — use /login/company only */
 export const DEMO_ACCOUNTS = [
+  {
+    email: 'company-admin@restoration.com',
+    role: 'Company Admin',
+    roleCode: 'super_admin' as RoleCode,
+  },
   {
     email: 'india@restoration.com',
     role: 'India Warehouse Manager',

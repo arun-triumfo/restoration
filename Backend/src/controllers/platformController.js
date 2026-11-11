@@ -14,11 +14,9 @@ function DemoRequest() {
   return getResourceModel('demo_requests', 'id', false)
 }
 
-/** Platform owner = Super Admin on the Restoration / default tenant only */
+/** Platform owner = SaaS seller flag only (company Super Admin is separate) */
 export function isPlatformAdmin(user) {
-  if (!user || user.roleCode !== 'super_admin') return false
-  const tid = user.tenantId || DEFAULT_TENANT_ID
-  return tid === DEFAULT_TENANT_ID || Boolean(user.isPlatformOwner)
+  return Boolean(user?.isPlatformOwner)
 }
 
 function daysUntil(iso) {
@@ -307,13 +305,14 @@ export async function activateTenant(req, res) {
         await User().create({
           email: adminEmail,
           name: tenant.contactName || 'Company Admin',
-          role: 'India Warehouse Manager',
-          roleCode: 'india_wh',
+          role: 'Company Admin',
+          roleCode: 'super_admin',
           status: 'Active',
           tenantId: tid,
           passwordHash,
           whAccess: 'As per role',
           perm: 'Role-based',
+          isPlatformOwner: false,
         })
         adminCred = { email: adminEmail, tempPassword }
       }
@@ -424,20 +423,21 @@ export async function createTenant(req, res) {
     await User().create({
       email: adminEmail,
       name: adminName,
-      role: 'India Warehouse Manager',
-      roleCode: 'india_wh',
+      role: 'Company Admin',
+      roleCode: 'super_admin',
       status: 'Active',
       tenantId: id,
       passwordHash,
       whAccess: 'As per role',
       perm: 'Role-based',
+      isPlatformOwner: false,
     })
 
     res.status(201).json({
       success: true,
       tenant: publicTenant(tenant.toObject ? tenant.toObject() : tenant),
       admin: { email: adminEmail, name: adminName, tempPassword },
-      message: 'Tenant created. Share temp password with company admin.',
+      message: 'Tenant created. Share temp password with company admin (ops app, not /saas).',
     })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })

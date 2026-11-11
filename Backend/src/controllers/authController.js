@@ -81,9 +81,8 @@ export async function login(req, res) {
     }
 
     const profile = await publicUser(user)
-    const isPlatformOwner =
-      profile.roleCode === 'super_admin' &&
-      (profile.tenantId === DEFAULT_TENANT_ID || Boolean(user.isPlatformOwner))
+    // Only the SaaS seller flag — company Super Admin is NOT platform owner
+    const isPlatformOwner = Boolean(user.isPlatformOwner)
 
     // SaaS gate: non-platform tenants need active billing + valid renew date
     if (!isPlatformOwner) {
@@ -143,9 +142,7 @@ export async function me(req, res) {
       return res.status(401).json({ success: false, message: 'User not found' })
     }
     const profile = await publicUser(user)
-    const isPlatformOwner =
-      profile.roleCode === 'super_admin' &&
-      (profile.tenantId === DEFAULT_TENANT_ID || Boolean(user.isPlatformOwner))
+    const isPlatformOwner = Boolean(user.isPlatformOwner)
     res.json({ success: true, user: { ...profile, isPlatformOwner } })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })

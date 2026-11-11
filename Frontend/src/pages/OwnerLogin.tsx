@@ -55,13 +55,14 @@ export function OwnerLogin() {
             RugOS SaaS console
           </p>
           <p className="mt-2 max-w-md text-sm text-slate-300">
-            Manage every company that subscribed — not warehouse day-to-day ops.
+            You sell RugOS. This is not the Company Admin who bought a plan.
           </p>
         </div>
         <ul className="space-y-2 text-sm text-slate-300">
           <li>• Buyers & activation</li>
           <li>• Plans · monthly / yearly · payments</li>
           <li>• Validity / expiry / suspend</li>
+          <li>• Company Admin → use Company sign-in instead</li>
         </ul>
         <div className="space-y-2 text-sm">
           <Link to="/login" className="block text-teal-300 hover:text-teal-200">
@@ -87,7 +88,11 @@ export function OwnerLogin() {
 
           <h1 className="text-xl font-semibold text-[var(--text-main)]">Owner sign in</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            After login you land on <strong>/saas</strong> only — buyers, subscriptions, demos.
+            Lands on <strong>/saas</strong> only. Company Admin (buyer) is a different login —{' '}
+            <Link to="/login/company" className="font-semibold text-teal-700 hover:underline">
+              company-admin@restoration.com
+            </Link>
+            .
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-3">

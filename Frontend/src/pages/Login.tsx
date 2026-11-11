@@ -5,8 +5,13 @@ import { DEMO_PASSWORD } from '../auth/roles'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../context/AuthContext'
 
-/** Company (tenant) roles only — ops app. Platform owner uses /login/owner. */
+/** Company (buyer) roles — ops app. Platform owner uses /login/owner → /saas only. */
 const COMPANY_DEMOS = [
+  {
+    email: 'company-admin@restoration.com',
+    role: 'Company Admin',
+    hint: 'Bought the SaaS plan · full company ops (not SaaS console)',
+  },
   {
     email: 'india@restoration.com',
     role: 'India Warehouse Manager',
@@ -27,7 +32,7 @@ const COMPANY_DEMOS = [
 export function Login() {
   const { user, loading, login, logout, isPlatformOwner } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('india@restoration.com')
+  const [email, setEmail] = useState('company-admin@restoration.com')
   const [password, setPassword] = useState(DEMO_PASSWORD)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -44,7 +49,9 @@ export function Login() {
       const res = await login(em.trim(), pw)
       if (res.isPlatformOwner) {
         logout()
-        setError('This is Company login. Platform owner must use Owner sign-in.')
+        setError(
+          'That account is Platform Owner (SaaS seller). Use Owner sign-in. Company Admin is company-admin@restoration.com.',
+        )
         return
       }
       navigate(res.redirectTo || '/dashboard', { replace: true })
@@ -71,10 +78,12 @@ export function Login() {
             RugOS / ExportOS
           </p>
           <p className="mt-2 max-w-md text-sm text-teal-100/80">
-            For companies with an active subscription. Not the SaaS owner console.
+            For the company that purchased a subscription — Admin + warehouse + finance. Never the
+            SaaS seller console.
           </p>
         </div>
         <ul className="space-y-2 text-sm text-teal-100/80">
+          <li>• Company Admin — bought the plan · full ops menus</li>
           <li>• India WH — mill, India stock, direct ship</li>
           <li>• US WH — pack & dispatch from US bucket</li>
           <li>• Finance — receivables & profitability</li>
@@ -84,7 +93,7 @@ export function Login() {
             ← Choose login type
           </Link>
           <Link to="/login/owner" className="block text-teal-200/70 hover:text-white">
-            Platform owner (SaaS) →
+            Platform owner (SaaS seller) →
           </Link>
         </div>
       </div>
@@ -105,8 +114,8 @@ export function Login() {
 
           <h1 className="text-xl font-semibold text-[var(--text-main)]">Company sign in</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Needs an <strong>active subscription</strong>. Opens Orders / Inventory / Shipping — not
-            the SaaS owner dashboard.
+            <strong>Company Admin</strong> = buyer who purchased SaaS → company dashboard. Not{' '}
+            <code className="text-[11px]">admin@restoration.com</code> (that is Platform Owner).
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-3">
@@ -141,7 +150,12 @@ export function Login() {
               </div>
             ) : null}
 
-            <Button type="submit" variant="primary" className="w-full !bg-teal-700 hover:!bg-teal-800" disabled={busy}>
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full !bg-teal-700 hover:!bg-teal-800"
+              disabled={busy}
+            >
               {busy ? 'Signing in…' : 'Sign in to company app'}
             </Button>
           </form>
@@ -158,7 +172,11 @@ export function Login() {
                   type="button"
                   disabled={busy}
                   onClick={() => void finishCompanyLogin(a.email, DEMO_PASSWORD)}
-                  className="flex flex-col rounded-xl border border-[var(--border-main)] bg-[var(--bg-elevated)] px-3 py-2.5 text-left transition hover:border-teal-600 disabled:opacity-60"
+                  className={`flex flex-col rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-60 ${
+                    a.email.startsWith('company-admin')
+                      ? 'border-teal-600 bg-teal-50 hover:border-teal-700 dark:bg-teal-950/30'
+                      : 'border-[var(--border-main)] bg-[var(--bg-elevated)] hover:border-teal-600'
+                  }`}
                 >
                   <span className="text-sm font-bold text-[var(--text-main)]">{a.role}</span>
                   <span className="font-mono text-[11px] text-[var(--text-dim)]">{a.email}</span>
@@ -169,9 +187,9 @@ export function Login() {
           </div>
 
           <p className="mt-6 text-center text-xs text-[var(--text-muted)]">
-            Platform owner (SaaS)?{' '}
+            SaaS seller console?{' '}
             <Link to="/login/owner" className="font-semibold text-indigo-600 hover:underline">
-              Owner sign-in
+              Platform owner sign-in
             </Link>
             {' · '}
             <Link to="/#pricing" className="font-semibold text-teal-700 hover:underline">
