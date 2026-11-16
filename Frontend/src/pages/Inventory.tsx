@@ -1,10 +1,7 @@
 import {
   Camera,
   Download,
-  Eye,
   MapPin,
-  MoveHorizontal,
-  PackagePlus,
   Pencil,
   Plus,
   Search,
@@ -482,6 +479,52 @@ export function Inventory() {
       } else {
         await create('skus', payload)
       }
+      const prevIn = Number(prevStock.indiaAvailable || 0)
+      const prevUs = Number(prevStock.usaAvailable || 0)
+      const stamp = new Date().toISOString()
+      const logMove = async (
+        type: string,
+        qty: number,
+        source: string,
+        dest: string,
+        note: string,
+      ) => {
+        if (!qty) return
+        await create('sku_history', {
+          recordKey: `${payload.sku}-${Date.now()}-${type}-${Math.random().toString(36).slice(2, 6)}`,
+          timestamp: stamp,
+          sku: payload.sku,
+          type,
+          qty: Math.abs(qty),
+          source,
+          dest,
+          user: 'inventory',
+          ref: note,
+        }).catch(() => {})
+      }
+      if (!editingSku) {
+        if (india) await logMove('IN', india, 'New SKU', 'India WH', 'Opening India stock')
+        if (usa) await logMove('IN', usa, 'New SKU', 'US WH', 'Opening US stock')
+      } else {
+        if (india !== prevIn) {
+          await logMove(
+            india > prevIn ? 'IN' : 'OUT',
+            india - prevIn,
+            india > prevIn ? 'Adjustment' : 'India WH',
+            india > prevIn ? 'India WH' : 'Adjustment',
+            `India qty ${prevIn} → ${india}`,
+          )
+        }
+        if (usa !== prevUs) {
+          await logMove(
+            usa > prevUs ? 'IN' : 'OUT',
+            usa - prevUs,
+            usa > prevUs ? 'Adjustment' : 'US WH',
+            usa > prevUs ? 'US WH' : 'Adjustment',
+            `US qty ${prevUs} → ${usa}`,
+          )
+        }
+      }
       setEditorOpen(false)
     } catch (err) {
       pushToast(err instanceof Error ? err.message : 'Save failed', 'danger')
@@ -561,8 +604,9 @@ export function Inventory() {
             Inventory · rack location & pickup
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Upload SKUs with warehouse, zone, aisle, rack and bin. Dispatch picks from that location.
-            Add live photos of the warehouse and the bin where the rug sits.
+            SKU qty + rack/bin location + warehouse photos. Use <strong>Rack / bin</strong> to see
+            where to pick. Qty edits write to <strong>Stock History</strong>. (GRN / +Stock / Move
+            shortcuts removed — edit the SKU instead.)
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -864,20 +908,13 @@ export function Inventory() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        <Button variant="secondary" size="sm" onClick={() => setPickSku(sku)}>
-                          <MapPin className="h-3.5 w-3.5" /> Pick
-                        </Button>
-                        <Button variant="secondary" size="sm" title="GRN">
-                          <PackagePlus className="h-3.5 w-3.5" /> GRN
-                        </Button>
-                        <Button variant="secondary" size="sm" title="Studio">
-                          <Eye className="h-3.5 w-3.5" /> Studio
-                        </Button>
-                        <Button variant="secondary" size="sm" title="Add Stock">
-                          <Plus className="h-3.5 w-3.5" /> Stock
-                        </Button>
-                        <Button variant="secondary" size="sm" title="Move">
-                          <MoveHorizontal className="h-3.5 w-3.5" /> Move
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          title="See zone / aisle / rack / bin for dispatch"
+                          onClick={() => setPickSku(sku)}
+                        >
+                          <MapPin className="h-3.5 w-3.5" /> Rack / bin
                         </Button>
                         <Button
                           variant="ghost"
@@ -1023,8 +1060,8 @@ export function Inventory() {
 
       <Modal
         open={!!pickSku}
-        title={pickSku ? `Pick ${String(pickSku.sku)}` : 'Pick location'}
-        badge="Dispatch"
+        title={pickSku ? `Rack / bin · ${String(pickSku.sku)}` : 'Pick location'}
+        badge="Where to find it"
         size="lg"
         onClose={() => setPickSku(null)}
         footer={

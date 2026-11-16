@@ -92,20 +92,64 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
   const [labelBusy, setLabelBusy] = useState<string | null>(null)
 
   const scopedRows = useMemo(() => {
-    if (meta.key !== 'returns') return rows
-    if (role === 'super_admin' || role === 'finance') return rows
-    if (role === 'usa_wh') {
-      return rows.filter((r) => String(r.queueOwner || '') === 'usa_wh')
+    let listRows = rows
+    if (meta.key === 'returns') {
+      if (role === 'super_admin' || role === 'finance') listRows = rows
+      else if (role === 'usa_wh') {
+        listRows = rows.filter((r) => String(r.queueOwner || '') === 'usa_wh')
+      } else if (role === 'india_wh') {
+        listRows = rows.filter(
+          (r) =>
+            String(r.queueOwner || 'india_wh') === 'india_wh' ||
+            String(r.status || '').includes('Pending'),
+        )
+      }
     }
-    if (role === 'india_wh') {
-      return rows.filter(
-        (r) =>
-          String(r.queueOwner || 'india_wh') === 'india_wh' ||
-          String(r.status || '').includes('Pending'),
+    if (meta.key === 'sku_history') {
+      return [...listRows].sort((a, b) =>
+        String(b.timestamp || '').localeCompare(String(a.timestamp || '')),
       )
     }
-    return rows
+    return listRows
   }, [meta.key, rows, role])
+
+  const guide =
+    meta.key === 'replenishment'
+      ? {
+          title: 'Sea / air movement tracking (India → US)',
+          steps: [
+            'Add a transfer: Mode = Sea (or Air), container / BL number, ETD / ETA.',
+            'Update Status as cargo moves: Packed at India → Departed → On water → Arrived US → Received in US WH.',
+            'Loading Plans = how cartons sit in that container. Shipping Desk = courier labels to the end customer (not ocean).',
+          ],
+        }
+      : meta.key === 'loading_plans'
+        ? {
+            title: 'Container load plan',
+            steps: [
+              'Create a plan before the vessel / truck leaves.',
+              'Put the same Container no. on Stock Transfers so movement trail matches.',
+              'Mode = Sea for ocean; Air for air freight.',
+            ],
+          }
+        : meta.key === 'sku_history'
+          ? {
+              title: 'This is the stock movement diary',
+              steps: [
+                'Each row = stock IN, OUT, or MOVE — with time, SKU, qty, from/to.',
+                'Rows are created when you change India / US qty on Inventory (Edit SKU).',
+                'If the list is empty, edit a SKU qty once — a history row will appear here.',
+              ],
+            }
+          : meta.key === 'export_docs'
+            ? {
+                title: 'Export paperwork',
+                steps: [
+                  'Commercial invoice / shipping bill for B2B and export consignments.',
+                  'Link Loading Plan ID when the goods go by sea container.',
+                ],
+              }
+            : null
 
   const tableCols = meta.columns.filter((c) => c.table !== false)
   const formCols = meta.columns.filter((c) => c.form !== false)
@@ -218,6 +262,17 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
         Live Mongo CRUD{canWrite ? ' — Add / Edit / Delete' : ' — view only for your role'} · tenant{' '}
         <code>{user?.tenantId}</code>
       </p>
+
+      {guide ? (
+        <div className="rounded-xl border border-teal-200 bg-teal-50/80 px-4 py-3 text-sm text-teal-950 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-100">
+          <p className="font-bold">{guide.title}</p>
+          <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[13px]">
+            {guide.steps.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

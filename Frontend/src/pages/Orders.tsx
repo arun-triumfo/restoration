@@ -72,7 +72,35 @@ const ORDER_CSV_HEADERS = [...FORM_FIELDS] as const
 
 const ORDER_CSV_SAMPLE: Record<(typeof ORDER_CSV_HEADERS)[number], string>[] = [
   {
-    orderId: 'ORD-BULK-001',
+    orderId: 'ORD-B2B-001',
+    channel: 'B2B Wholesale',
+    marketplaceOrderId: 'PO-CLIENT-7781',
+    orderDate: new Date().toISOString().slice(0, 10),
+    buyerName: 'Nordic Living AB',
+    sku: 'SKU-DEMO-INDIA-STOCK',
+    qty: '3',
+    totalOrderUSD: '4200',
+    status: 'Pending Allocation',
+    fulfillmentWh: 'India Warehouse',
+    shippingAddress: 'Warehouse 4, Gothenburg Port, Sweden',
+    awb: '',
+  },
+  {
+    orderId: 'ORD-B2B-002',
+    channel: 'B2B Wholesale',
+    marketplaceOrderId: 'PO-CLIENT-7782',
+    orderDate: new Date().toISOString().slice(0, 10),
+    buyerName: 'Austin Floor Co',
+    sku: 'SKU-DEMO-US-STOCK',
+    qty: '2',
+    totalOrderUSD: '2100',
+    status: 'Pending Allocation',
+    fulfillmentWh: 'US Warehouse',
+    shippingAddress: '2400 Mill Road, Edison NJ 08817 USA',
+    awb: '',
+  },
+  {
+    orderId: 'ORD-BULK-003',
     channel: 'Amazon US',
     marketplaceOrderId: 'AMZ-111-222',
     orderDate: new Date().toISOString().slice(0, 10),
@@ -83,20 +111,6 @@ const ORDER_CSV_SAMPLE: Record<(typeof ORDER_CSV_HEADERS)[number], string>[] = [
     status: 'Pending Allocation',
     fulfillmentWh: 'US Warehouse',
     shippingAddress: '12 Main St, Edison NJ 08817 USA',
-    awb: '',
-  },
-  {
-    orderId: 'ORD-BULK-002',
-    channel: 'Shopify DTC',
-    marketplaceOrderId: 'SHP-9001',
-    orderDate: new Date().toISOString().slice(0, 10),
-    buyerName: 'Alex Customer',
-    sku: 'SKU-DEMO-INDIA-STOCK',
-    qty: '1',
-    totalOrderUSD: '680',
-    status: 'Pending Allocation',
-    fulfillmentWh: 'India Warehouse',
-    shippingAddress: '88 Oak Ave, Austin TX 78701 USA',
     awb: '',
   },
 ]
@@ -353,10 +367,30 @@ export function Orders() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'rugos-orders-template.csv'
+    a.download = 'rugos-orders-b2b-template.csv'
     a.click()
     URL.revokeObjectURL(url)
-    pushToast('Sample order sheet downloaded', 'success')
+    pushToast('Sample sheet downloaded (includes B2B Wholesale rows)', 'success')
+  }
+
+  const downloadB2bTemplate = () => {
+    const escape = (v: string) => {
+      if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`
+      return v
+    }
+    const b2bOnly = ORDER_CSV_SAMPLE.filter((r) => r.channel === 'B2B Wholesale')
+    const header = ORDER_CSV_HEADERS.join(',')
+    const rows = b2bOnly.map((row) =>
+      ORDER_CSV_HEADERS.map((h) => escape(String(row[h] ?? ''))).join(','),
+    )
+    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'rugos-b2b-orders-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    pushToast('B2B-only sample template downloaded', 'success')
   }
 
   const importOrdersCsv = async (file: File) => {
@@ -432,10 +466,47 @@ export function Orders() {
   const openCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
     try {
       stopCamera()
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: facing } },
-        audio: false,
-      })
+      if (shipVideoRef.current) shipVideoRef.current.srcObject = null
+      // Let the previous track fully release before reopening (fixes Switch front/back)
+      await new Promise((r) => setTimeout(r, 250))
+
+      let stream: MediaStream | null = null
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: facing } },
+          audio: false,
+        })
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facing } },
+          audio: false,
+        })
+      }
+
+      // Prefer matching deviceId when the browser lists multiple cameras
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const cams = devices.filter((d) => d.kind === 'videoinput')
+        if (cams.length > 1) {
+          const wantFront = facing === 'user'
+          const match = cams.find((d) => {
+            const label = d.label.toLowerCase()
+            if (wantFront) return /front|user|face/.test(label)
+            return /back|rear|environment|world/.test(label)
+          })
+          const pick = match || (wantFront ? cams[0] : cams[cams.length - 1])
+          if (pick?.deviceId) {
+            stream.getTracks().forEach((t) => t.stop())
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { deviceId: { exact: pick.deviceId } },
+              audio: false,
+            })
+          }
+        }
+      } catch {
+        /* keep stream from facingMode */
+      }
+
       shipStreamRef.current = stream
       setCameraFacing(facing)
       if (shipVideoRef.current) {
@@ -443,7 +514,10 @@ export function Orders() {
         await shipVideoRef.current.play()
       }
     } catch {
-      pushToast('Camera not available — upload a photo instead', 'info')
+      pushToast(
+        'Could not switch camera on this device. Use Upload photo, or allow camera permission.',
+        'info',
+      )
     }
   }
 
@@ -655,17 +729,18 @@ export function Orders() {
             Order Pipeline
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Only 2 warehouses: <strong>India Warehouse</strong> and <strong>US Warehouse</strong>.
-            {role === 'super_admin' || role === 'finance'
-              ? ' Super Admin / Finance see every order — use bucket + date filters.'
-              : ' Pending work is listed first.'}
+            Marketplace + <strong>B2B Wholesale</strong> orders in one list. Filter channel = B2B to
+            see only wholesale. Bulk CSV uploads B2B sheets the same way.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {(role === 'india_wh' || role === 'super_admin' || role === 'finance') && (
             <>
+              <Button variant="secondary" size="sm" onClick={downloadB2bTemplate}>
+                <Download className="h-3.5 w-3.5" /> B2B sample template
+              </Button>
               <Button variant="secondary" size="sm" onClick={downloadOrderTemplate}>
-                <Download className="h-3.5 w-3.5" /> Download sample template
+                <Download className="h-3.5 w-3.5" /> All-channels template
               </Button>
               <Button
                 variant="secondary"
@@ -701,6 +776,23 @@ export function Orders() {
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-teal-200 bg-teal-50/80 px-4 py-3 text-sm text-teal-950 dark:border-teal-500/30 dark:bg-teal-500/10 dark:text-teal-100">
+        <p className="font-bold">B2B Wholesale orders</p>
+        <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-[13px]">
+          <li>
+            Download <strong>B2B sample template</strong> → fill buyer PO / SKU / qty →{' '}
+            <strong>Bulk CSV upload</strong>.
+          </li>
+          <li>
+            Or <strong>+ New Order</strong> → Channel = <em>B2B Wholesale</em>.
+          </li>
+          <li>
+            Filter <strong>All Channels → B2B Wholesale</strong> to see only those rows (purple
+            badge).
+          </li>
+        </ol>
       </div>
 
       <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">

@@ -35,10 +35,10 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: '4 · MOVE & SHIP',
     items: [
-      { label: 'Stock Transfers', path: '/stock-transfers', icon: 'ArrowLeftRight' },
+      { label: 'Stock Transfers (sea/air)', path: '/stock-transfers', icon: 'ArrowLeftRight' },
       { label: 'Packing Station', path: '/packing', icon: 'Package' },
-      { label: 'Loading Plans', path: '/loading-plans', icon: 'Container' },
-      { label: 'Shipping Desk', path: '/shipping', icon: 'Truck' },
+      { label: 'Loading Plans (container)', path: '/loading-plans', icon: 'Container' },
+      { label: 'Shipping Desk (labels)', path: '/shipping', icon: 'Truck' },
       { label: 'Export Docs', path: '/export-docs', icon: 'FileCheck' },
     ],
   },
