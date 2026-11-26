@@ -154,26 +154,55 @@ export function createResource(resource) {
         payload.financeTagged = true
       }
 
-      // Finance: courier bill vs recorded weight / rate → Logistics Error
+      // Finance: courier bill vs recorded weight / rate → Logistics Error + USD diffs
       if (resource === 'courier_audit') {
-        const billed = Number(payload.billedWeightKg ?? payload.billedWeight ?? 0)
-        const actual = Number(payload.actualWeightKg ?? payload.actualWeight ?? payload.recordedWeightKg ?? 0)
-        const billedAmt = Number(payload.billedAmount ?? payload.amountBilled ?? 0)
-        const agreed = Number(payload.agreedAmount ?? payload.amountAgreed ?? payload.expectedAmount ?? 0)
-        const weightMismatch = billed > 0 && actual > 0 && Math.abs(billed - actual) > 0.15
-        const priceMismatch = billedAmt > 0 && agreed > 0 && Math.abs(billedAmt - agreed) > 0.5
-        if (weightMismatch || priceMismatch || payload.logisticsError) {
-          payload.logisticsError = true
-          payload.status = payload.status || 'Logistics Error'
-          payload.flagReason =
-            payload.flagReason ||
-            [
-              weightMismatch ? `Weight mismatch billed ${billed} vs recorded ${actual}` : null,
-              priceMismatch ? `Price mismatch billed ${billedAmt} vs agreed ${agreed}` : null,
-            ]
-              .filter(Boolean)
-              .join('; ')
+        const { enrichAuditFields } = await import('./courierAuditController.js')
+        payload = enrichAuditFields({
+          ...payload,
+          expectedUSD: payload.expectedUSD ?? payload.expectedAmount ?? payload.agreedAmount,
+          billedUSD: payload.billedUSD ?? payload.billedAmount ?? payload.amountBilled,
+        })
+      }
+
+      // Export docs: ensure EXP-ID + empty docs checklist
+      if (resource === 'export_docs') {
+        if (!payload.exportShipmentId && payload.stockTransferId) {
+          try {
+            const Transfer = getResourceModel('replenishment', 'shipmentId', true)
+            const t = await Transfer.findOne({
+              $and: [tenantFilter(req), { shipmentId: String(payload.stockTransferId) }],
+            }).lean()
+            if (t?.exportShipmentId) payload.exportShipmentId = t.exportShipmentId
+          } catch {
+            /* ignore */
+          }
         }
+        if (!Array.isArray(payload.documents)) payload.documents = []
+        if (!Array.isArray(payload.documentChecklist)) {
+          payload.documentChecklist = [
+            { category: 'Proforma / Commercial invoice', state: 'Pending' },
+            { category: 'Packing list', state: 'Pending' },
+            { category: 'India shipping bill / LEO', state: 'Pending' },
+            { category: 'BL / AWB', state: 'Pending' },
+            { category: 'ISF / US entry', state: 'Pending' },
+          ]
+        }
+        payload.docStatus = payload.docStatus || 'Draft'
+        payload.timeline = Array.isArray(payload.timeline)
+          ? payload.timeline
+          : [
+              {
+                id: `ev-${Date.now()}`,
+                at: new Date().toISOString(),
+                by: req.user?.email || 'system',
+                note: 'Export file created',
+              },
+            ]
+      }
+
+      // Returns: case type default
+      if (resource === 'returns' && !payload.caseType) {
+        payload.caseType = 'Return'
       }
 
       const created = await Model.create(payload)

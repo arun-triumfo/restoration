@@ -24,6 +24,11 @@ import { PackingStation } from './pages/PackingStation'
 import { ResourcePage } from './pages/ResourcePage'
 import { SaasOwner } from './pages/SaasOwner'
 import { ShippingDesk } from './pages/ShippingDesk'
+import { CourierAudit } from './pages/CourierAudit'
+import { ExportDocs } from './pages/ExportDocs'
+import { Profitability } from './pages/Profitability'
+import { ReturnsClaims } from './pages/ReturnsClaims'
+import { StockTransfers } from './pages/StockTransfers'
 import { SystemWorkflow } from './pages/SystemWorkflow'
 import { TenantsAdmin } from './pages/TenantsAdmin'
 import { UsersAdmin } from './pages/UsersAdmin'
@@ -47,6 +52,11 @@ const NATIVE_PATHS = new Set([
   '/orders',
   '/inventory',
   '/mto',
+  '/stock-transfers',
+  '/export-docs',
+  '/returns',
+  '/courier-audit',
+  '/profitability',
   '/dashboard',
 ])
 
@@ -194,6 +204,46 @@ export default function App() {
                 element={
                   <RequirePath>
                     <MtoJobs />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="stock-transfers"
+                element={
+                  <RequirePath>
+                    <StockTransfers />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="export-docs"
+                element={
+                  <RequirePath>
+                    <ExportDocs />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="returns"
+                element={
+                  <RequirePath>
+                    <ReturnsClaims />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="courier-audit"
+                element={
+                  <RequirePath>
+                    <CourierAudit />
+                  </RequirePath>
+                }
+              />
+              <Route
+                path="profitability"
+                element={
+                  <RequirePath>
+                    <Profitability />
                   </RequirePath>
                 }
               />

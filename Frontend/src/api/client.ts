@@ -400,6 +400,22 @@ export const api = {
       ),
   },
 
+  transfers: {
+    dispatch: (shipmentId: string) =>
+      request<{ success: boolean; message?: string; transfer?: ResourceRow }>(
+        `/transfers/${encodeURIComponent(shipmentId)}/dispatch`,
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
+    receive: (
+      shipmentId: string,
+      lines?: { sku: string; good: number; damaged: number; missing: number }[],
+    ) =>
+      request<{ success: boolean; message?: string; transfer?: ResourceRow }>(
+        `/transfers/${encodeURIComponent(shipmentId)}/receive`,
+        { method: 'POST', body: JSON.stringify({ lines }) },
+      ),
+  },
+
   fulfillment: {
     reRoute: (orderIds?: string[]) =>
       request<{ success: boolean; count: number; data: ResourceRow[]; message?: string }>(
@@ -549,6 +565,94 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ returnId, ...extras }),
       }),
+    inspect: (
+      returnId: string,
+      body: { condition: string; notes?: string; photoDataUrl?: string; repairCostUSD?: number },
+    ) =>
+      request<{ success: boolean; data: ResourceRow; message?: string; pnl?: ResourceRow }>(
+        '/returns/actions/inspect',
+        { method: 'POST', body: JSON.stringify({ returnId, ...body }) },
+      ),
+    markRefunded: (returnId: string, refundUSD?: number) =>
+      request<{ success: boolean; data: ResourceRow; message?: string; pnl?: ResourceRow }>(
+        '/returns/actions/mark-refunded',
+        { method: 'POST', body: JSON.stringify({ returnId, refundUSD }) },
+      ),
+    openClaim: (
+      returnId: string,
+      body?: {
+        claimValueUSD?: number
+        claimCarrier?: string
+        claimAwb?: string
+        linkedShipmentId?: string
+        pushCourierAudit?: boolean
+        notes?: string
+      },
+    ) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/returns/actions/open-claim',
+        { method: 'POST', body: JSON.stringify({ returnId, ...body }) },
+      ),
+  },
+
+  exportDocsApi: {
+    createFromTransfer: (shipmentId: string, extras?: { invoiceNo?: string; forceNew?: boolean }) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/export_docs/actions/create-from-transfer',
+        { method: 'POST', body: JSON.stringify({ shipmentId, ...extras }) },
+      ),
+    addDocument: (invoiceNo: string, document: ResourceRow) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/export_docs/actions/add-document',
+        { method: 'POST', body: JSON.stringify({ invoiceNo, document }) },
+      ),
+    generatePdf: (invoiceNo: string, kind: 'commercial' | 'packing') =>
+      request<{ success: boolean; html?: string; kind?: string; message?: string }>(
+        '/export_docs/actions/generate-pdf',
+        { method: 'POST', body: JSON.stringify({ invoiceNo, kind }) },
+      ),
+  },
+
+  courierAuditApi: {
+    summary: () =>
+      request<{ success: boolean; data: ResourceRow }>('/courier_audit/actions/summary'),
+    match: (invoiceNo: string, extras?: { awb?: string; orderRef?: string }) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/courier_audit/actions/match',
+        { method: 'POST', body: JSON.stringify({ invoiceNo, ...extras }) },
+      ),
+    dispute: (invoiceNo: string, extras?: { disputeRef?: string; note?: string }) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/courier_audit/actions/dispute',
+        { method: 'POST', body: JSON.stringify({ invoiceNo, ...extras }) },
+      ),
+    resolveCredit: (invoiceNo: string, creditUSD?: number) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/courier_audit/actions/resolve-credit',
+        { method: 'POST', body: JSON.stringify({ invoiceNo, creditUSD }) },
+      ),
+    importCsv: (csv: string) =>
+      request<{
+        success: boolean
+        created?: number
+        skipped?: number
+        message?: string
+      }>('/courier_audit/actions/import-csv', {
+        method: 'POST',
+        body: JSON.stringify({ csv }),
+      }),
+  },
+
+  profitabilityApi: {
+    dashboard: (period?: string) => {
+      const q = period ? `?period=${encodeURIComponent(period)}` : ''
+      return request<{ success: boolean; data: ResourceRow }>(`/profitability/actions/dashboard${q}`)
+    },
+    syncPeriod: (period?: string) =>
+      request<{ success: boolean; data: ResourceRow; message?: string }>(
+        '/profitability/actions/sync-period',
+        { method: 'POST', body: JSON.stringify({ period }) },
+      ),
   },
 
   purchaseOrders: {

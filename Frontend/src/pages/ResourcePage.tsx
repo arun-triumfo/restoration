@@ -143,13 +143,41 @@ export function ResourcePage({ meta }: { meta: ResourceMeta }) {
             }
           : meta.key === 'export_docs'
             ? {
-                title: 'Export paperwork',
+                title: 'Export Documentation — one master shipment ID',
                 steps: [
-                  'Commercial invoice / shipping bill for B2B and export consignments.',
-                  'Link Loading Plan ID when the goods go by sea container.',
+                  'Use Export Shipment ID like EXP-USA-2026-0001 (same as Stock Transfers). Never create a duplicate shipment just to add another invoice or PDF.',
+                  'Fill invoice, consignee, destination, shipment type (20/40 FCL / LCL / air), customs + document status.',
+                  'Link Stock Transfer ID + Loading Plan. Search by EXP-ID, invoice, container, or BL/AWB.',
                 ],
               }
-            : null
+            : meta.key === 'returns'
+              ? {
+                  title: 'Returns & Claims',
+                  steps: [
+                    'Case Type = Return (customer) or Claim (carrier). Link Order + SKU so details auto-fill.',
+                    'Track status through label → in transit → received → inspected → refunded / claim paid.',
+                    'Inspection result drives inventory only after authorized receive. P&L impact feeds Profitability.',
+                  ],
+                }
+              : meta.key === 'courier_audit'
+                ? {
+                    title: 'Courier bill audit',
+                    steps: [
+                      'Enter/import courier invoice lines with AWB. Match to order / shipment.',
+                      'Compare expected vs billed; mark Verified / Needs Review / Disputed / Credit Pending / Resolved.',
+                      'Confirmed credits and net costs only — avoid double counting in Profitability.',
+                    ],
+                  }
+                : meta.key === 'monthly_financials'
+                  ? {
+                      title: 'Profitability',
+                      steps: [
+                        'View margin by period. Drill into orders, export shipments, returns, and courier credits.',
+                        'Separate estimated vs actual costs while cargo is in transit; update when bills arrive.',
+                        'Container shared costs allocate by qty / weight / CBM (record method in notes).',
+                      ],
+                    }
+                  : null
 
   const tableCols = meta.columns.filter((c) => c.table !== false)
   const formCols = meta.columns.filter((c) => c.form !== false)

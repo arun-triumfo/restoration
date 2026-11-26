@@ -38,8 +38,31 @@ import {
   shipIndiaToUs,
   usReceive,
 } from './controllers/fulfillmentController.js'
-import { buyReturnLabel, usReceiveReturn } from './controllers/returnsController.js'
+import {
+  buyReturnLabel,
+  inspectReturn,
+  markRefunded,
+  openClaim,
+  usReceiveReturn,
+} from './controllers/returnsController.js'
+import {
+  addDocument,
+  createFromTransfer,
+  generatePdf,
+} from './controllers/exportDocsController.js'
+import {
+  auditSummary,
+  disputeAudit,
+  importCsv,
+  matchAudit,
+  resolveCredit,
+} from './controllers/courierAuditController.js'
+import {
+  profitabilityDashboard,
+  syncPeriod,
+} from './controllers/profitabilityController.js'
 import { advanceStage, ensureJobs } from './controllers/mtoController.js'
+import { dispatchTransfer, receiveTransfer } from './controllers/transferController.js'
 import { RESOURCES } from './resources.js'
 
 dotenv.config()
@@ -131,6 +154,22 @@ app.post(
   fromBuySheet,
 )
 
+// Stock transfer inventory posting (before generic CRUD)
+app.post(
+  '/api/transfers/:shipmentId/dispatch',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('replenishment', 'write'),
+  dispatchTransfer,
+)
+app.post(
+  '/api/transfers/:shipmentId/receive',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('replenishment', 'write'),
+  receiveTransfer,
+)
+
 // Restoration fulfillment actions (must mount before generic /api/orders CRUD)
 app.post(
   '/api/orders/actions/re-route',
@@ -215,6 +254,100 @@ app.post(
   requireActiveBilling,
   requirePermission('returns', 'write'),
   usReceiveReturn,
+)
+app.post(
+  '/api/returns/actions/inspect',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('returns', 'write'),
+  inspectReturn,
+)
+app.post(
+  '/api/returns/actions/mark-refunded',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('returns', 'write'),
+  markRefunded,
+)
+app.post(
+  '/api/returns/actions/open-claim',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('returns', 'write'),
+  openClaim,
+)
+
+app.post(
+  '/api/export_docs/actions/create-from-transfer',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('export_docs', 'write'),
+  createFromTransfer,
+)
+app.post(
+  '/api/export_docs/actions/add-document',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('export_docs', 'write'),
+  addDocument,
+)
+app.post(
+  '/api/export_docs/actions/generate-pdf',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('export_docs', 'read'),
+  generatePdf,
+)
+
+app.get(
+  '/api/courier_audit/actions/summary',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('courier_audit', 'read'),
+  auditSummary,
+)
+app.post(
+  '/api/courier_audit/actions/match',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('courier_audit', 'write'),
+  matchAudit,
+)
+app.post(
+  '/api/courier_audit/actions/dispute',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('courier_audit', 'write'),
+  disputeAudit,
+)
+app.post(
+  '/api/courier_audit/actions/resolve-credit',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('courier_audit', 'write'),
+  resolveCredit,
+)
+app.post(
+  '/api/courier_audit/actions/import-csv',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('courier_audit', 'write'),
+  importCsv,
+)
+
+app.get(
+  '/api/profitability/actions/dashboard',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('monthly_financials', 'read'),
+  profitabilityDashboard,
+)
+app.post(
+  '/api/profitability/actions/sync-period',
+  authenticate,
+  requireActiveBilling,
+  requirePermission('monthly_financials', 'write'),
+  syncPeriod,
 )
 
 app.use('/api/resources', authenticate, requireActiveBilling, resourceRoutes)
